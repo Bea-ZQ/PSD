@@ -1,0 +1,159 @@
+Agregar datos de emfisis -> Domingo porque necesito ayuda de  César
+
+incorporar de alguna forma los errores
+modificar step 2 y interpolate_alpha_K
+
+
+filtrar valores malos de inputs para el modelo de campo magnético
+qué pasa cuando un target alpha es nan?
+preguntar víctor hro y hro2
+qué pasa si ect tiene menos resolución
+agregar errores
+ver bien cuál es la mejor forma de guardar
+
+crear función all steps o steps inv y steps fedu -> esto es para poder paralelizar
+
+k grandes y k chicos se traducen a pich angle grande o chico?
+
+    ##############3
+
+
+
+    def check_transformation_psd(func_fit, fit_flag, parms, psd_func, c_unit, energy_bins, psd_data, title, E_mu, psd_E):
+        energy = np.linspace(1,20, 100)
+        log_energy = np.log10(energy)
+
+        fig, ax = plt.subplots()
+        ax.set_title(title)
+        ax.set_yscale('log')
+
+        if fit_flag == 'pl':
+            log_j = func_fit(log_energy, parms[0], parms[1])
+
+        if fit_flag == 'spl':
+            log_j = func_fit(energy)
+            print('in spl')
+        j = 10**log_j
+        psd = psd_func(j, energy*energy_bins.unit, c_unit)
+        ax.plot(energy, psd, color = 'r')
+        ax.plot(energy_bins, psd_data, '*', color = 'b', label = 'Fitted PSD data')
+        ax.plot(E_mu, psd_E, 'o', color = 'r', label = 'Target energy')
+
+
+        ax.set_ylabel('PSD [%s]' % str(psd.unit))
+        ax.set_xlabel('Energy [%s]' % str(energy_bins.unit))
+        plt.show()
+        plt.close(fig)
+        return
+
+    # Cambiarle los nombres de check
+
+
+
+
+
+    def check_step2_180(Ks_lin, Ks_geom, model, x_input, mag_input, Re, spline_lin, spline_geom, K_range):
+    # Este fragmento de código es para verificar visualmente que la interpolación esté funcionando
+        alphas_full = np.linspace(1, 180, 200)*u.degree
+        _, Ks_full, _ = calculate_K_model(alphas_full, model, x_input, mag_input, Re, '2')
+        plot_alpha_K(Ks_full, alphas_full, False, '180°')
+        plt.show()
+
+        Ks_interp_lin = np.linspace(Ks_lin[-1], Ks_lin[0], 1000)
+        Ks_interp_geom = np.linspace(Ks_geom[-1], Ks_geom[0], 1000)
+
+        ax = plot_interpolation_alpha_K(Ks_interp_lin, Ks_interp_geom, Ks_full, alphas_full, spline_lin, spline_geom, True)
+
+        K_interp1 = K_range[5]
+        K_interp2 = K_range[30]
+        K_interp3 = K_range[70]
+
+        alpha_interp1 = interpolate_alpha_K(K_interp1, Ks_lin[0], spline_lin, spline_geom, True)
+        alpha_interp2 = interpolate_alpha_K(K_interp2, Ks_lin[0], spline_lin, spline_geom, True)
+        alpha_interp3 = interpolate_alpha_K(K_interp3, Ks_lin[0], spline_lin, spline_geom, True)
+
+        ax.plot(np.log10(K_interp1.value), alpha_interp1[0].value, 'o', color = 'r')
+        ax.plot(np.log10(K_interp2.value), alpha_interp2[0].value, 'o', color = 'r')
+        ax.plot(np.log10(K_interp3.value), alpha_interp3[0].value, 'o', color = 'r')
+        ax.plot(np.log10(K_interp1.value), alpha_interp1[1].value, 'o', color = 'cyan')
+        ax.plot(np.log10(K_interp2.value), alpha_interp2[1].value, 'o', color = 'cyan')
+        ax.plot(np.log10(K_interp3.value), alpha_interp3[1].value, 'o', color = 'cyan')
+
+        plt.show()
+
+
+
+
+
+
+
+    def plot_interpolation_alpha_K(Ks_interp_lin, Ks_interp_geom, Ks_full, alphas_full, spline_lin, spline_geom, flag=False):
+        alphas_interp_lin = spline_lin(np.log10(Ks_interp_lin.value))
+        alphas_interp_geom = spline_geom(np.log10(Ks_interp_geom.value))
+
+        fig, ax = plt.subplots()
+        print('ks_fulll', Ks_full)
+        print('alphas_full', alphas_full)
+        ax.plot(np.log10(Ks_full.value), alphas_full.value, '*', color = 'b', label = 'Data')
+        ax.plot(np.log10(Ks_interp_lin.value), alphas_interp_lin, color = 'r', label = 'Interp')
+        ax.plot(np.log10(Ks_interp_geom.value), alphas_interp_geom, color='r')
+
+        if flag:
+            alphas_interp_lin_2 = 180 - alphas_interp_lin
+            alphas_interp_geom_2 = 180 - alphas_interp_geom
+            ax.plot(np.log10(Ks_interp_lin.value), alphas_interp_lin_2, color = 'cyan', label = 'Interp 180')
+            ax.plot(np.log10(Ks_interp_geom.value), alphas_interp_geom_2, color='cyan')
+            ax.set_yscale('log')
+
+        ax.set_ylabel('alphas')
+        ax.set_xlabel('log10(K)')
+        ax.legend()
+        return ax
+
+
+
+
+
+
+    def calculate_time_periods(df_rept, Re):
+        dates, x_geo, y_geo, z_geo = get_GEO_coordinates(df_rept, Re)
+
+        '''
+        fig, ax = plt.subplots()
+        ax.plot(x_geo, y_geo, color = 'red')
+        tierra = plt.Circle((0, 0), 1, color='gray', fill=True)
+
+        ax.set_xlabel('X GEO', fontsize=15)
+        ax.set_ylabel('Y GEO', fontsize=15)
+        ax.set_title('RBSP ORBIT')
+        ax.add_artist(tierra)
+        ax.set_aspect('equal')  # Mantener la proporción 1:1
+        ax.legend()
+        ax.tick_params(axis='x', labelsize=15)
+        ax.tick_params(axis='y', labelsize=15)
+        plt.tight_layout()
+        plt.grid(True)
+        '''
+        order = 100
+        r2 = x_geo**2 + y_geo**2 + z_geo **2
+        x = np.array(list(range(len(r2))))
+
+        apogee_indices = argrelextrema(r2, np.greater, order=order)[0]
+        perigee_indices = argrelextrema(r2, np.less, order=order)[0]
+
+        apogees = r2[apogee_indices]
+        x_ap = x[apogee_indices]
+        perigees = r2[perigee_indices]
+        x_per = x[perigee_indices]
+
+        fig1, ax1 = plt.subplots()
+        ax1.plot(x, r2, '*', color = 'red')
+        ax1.plot(x_ap, apogees,'o', color = 'b')
+        ax1.plot(x_per, perigees,'o', color = 'b')
+        plt.show()
+        dates_ap = dates.iloc[apogee_indices]
+        dates_per = dates.iloc[perigee_indices]
+
+        dates_out =pd.concat([dates_per, dates_ap])
+        dates_out= dates_out.sort_values()
+        return dates_out
