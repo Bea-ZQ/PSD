@@ -305,12 +305,47 @@ def step5(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK, inst):
     with open(os.devnull, 'w') as fnull:
         with contextlib.redirect_stdout(fnull):
             fit_results = fp.fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_energy)
-    fit, parameters, max_values = fit_results
+    fit, parameters, max_values= fit_results[:3]
 
     # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
     array_indexes = np.array(range(N_energy))[fit]
     js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
     for i, idx in enumerate(array_indexes):
+        max_flux = max_values[idx]
+        par_opt = parameters[idx]
+        js_idx = func(np.radians(alphasK.value), *par_opt)
+        js_alphasK[i, :] = js_idx*max_flux.value
+
+    energy_bins_to_use = energy_bins[fit]
+    print()
+    return js_alphasK*max_values.unit, energy_bins_to_use, fit_results
+
+
+
+def step5_V2(list_fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK, inst):
+    # Step 5: Interpolar datos j(alpha) para cada canal de energía para obtener
+    # flujos en target alphaK
+    print('-------------------------------------------------------------------')
+    print('STEP 5: Interpolate j(alpha). Get flux at target alphaK for each')
+    print('                       energy channel')
+    print('-------------------------------------------------------------------')
+
+    energy_bins, alpha_bins = list_bins
+    print(f'* Using functions best function for interpolation:')
+    print(f'      ')
+    print(f'* Instrumet: {inst}')
+    # Obtenemos el mejor ajuste
+    with open(os.devnull, 'w') as fnull:
+        with contextlib.redirect_stdout(fnull):
+            fit_results = fp.fitting_alpha_flux_V2(list_fit_info, fedu, channels_to_use, alpha_bins, N_energy)
+
+    fit, parameters, max_values, _, _, fit_opts, funcs = fit_results
+
+    # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
+    array_indexes = np.array(range(N_energy))[fit]
+    js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
+    for i, idx in enumerate(array_indexes):
+        func = funcs[idx]
         max_flux = max_values[idx]
         par_opt = parameters[idx]
         js_idx = func(np.radians(alphasK.value), *par_opt)

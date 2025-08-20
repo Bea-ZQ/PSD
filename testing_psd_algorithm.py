@@ -440,8 +440,8 @@ mageis_fit, _, _, mageis_err, mageis_err_fit = mageis_PA_fit_res
 rept_fit_opts = [PA_fit_opt if val else None for val in rept_fit]
 mageis_fit_opts = [PA_fit_opt if val else None for val in mageis_fit]
 
-rept_func = [fp.info_fit_PA_flux(opt)[2] for opt in rept_fit_opts]
-mageis_func = [fp.info_fit_PA_flux(opt)[2] for opt in mageis_fit_opts]
+rept_func = [PA_fit_info[2] if val else None for val in rept_fit]
+mageis_func = [PA_fit_info[2] if val else None for val in mageis_fit]
 
 # Calculamos flujo at target alphaK
 rept_flux_alphaK = fp.fitted_flux_at_alphaK(rept_PA_fit_res, rept_func, target_alphaK)
@@ -465,8 +465,10 @@ plots_fp.check_fit_PA_flux(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bin
 
 print('BEST FUNCTION')
 list_PA_fit_info = [fp.info_fit_PA_flux('1'), fp.info_fit_PA_flux('2')]
+
 rept_PA_fit_res2 = fp.fitting_alpha_flux_V2(list_PA_fit_info, rept_fedu,
                    rept_channels, rept_alpha_bins, rept_N)
+
 mageis_PA_fit_res2 = fp.fitting_alpha_flux_V2(list_PA_fit_info, mageis_fedu,
                      mageis_channels, mageis_alpha_bins, mageis_N)
 

@@ -10,6 +10,7 @@ import Source.invariants_calculation as inv
 import Source.psd_calculation as psd
 import Source.plots_psd_calculation as plots_psd
 import Source.psd_processing as psd_proc
+import Source.get_units as get_units
 
 import os
 import pathlib
@@ -103,12 +104,15 @@ Lstar_opt = '2'
 # Unidades de Re*(nT**(1/2)) para K
 # Unidades de MeV/nT para mu
 
-units_flux = fp.create_units_flux()
-units_inv = inv.create_units_inv()
+units_inv = get_units.adiab_inv()
+units_flux = get_units.flux()
+units_psd = get_units.psd()
 
-unit_flux_mev, unit_flux_kev, unit_c = units_flux
-Re_km, unit_Re, unit_K, unit_mu = units_inv
-units_psd = [unit_c, unit_flux_mev]
+_, _, unit_K, unit_mu = units_inv
+units = [units_inv, units_flux, units_psd]
+unit_flux_mev, unit_flux_kev = units_flux
+
+#units_psd = [unit_c, unit_flux_mev]
 
 target_Ks = target_Ks*unit_K
 target_mus = target_mus*unit_mu
@@ -147,7 +151,7 @@ omni_info, omni_meta = psd.step0_get_OMNI_data(start_time, end_time, data_dir_om
 ### Creamos los inputs
 inputs_mf, inputs_fedus, N = psd.step0_inputs(ect_info, omni_info, start_time,
                              end_time, res_omni, rept_fedus, mageis_fedus,
-                             units_flux, units_inv)
+                             units)
 
 x_inputs, mag_inputs = inputs_mf
 rept_fedus_inputs, mageis_fedus_inputs = inputs_fedus
@@ -191,7 +195,7 @@ df_psd = pd.DataFrame(columns = cols)
 df_lstar = pd.DataFrame(columns=cols)
 
 # Loop en el tiempo
-N = 4
+N = 1
 show = False
 for i in range(N):
     # Obtenemos los inputs del modelo de campo magnético, para el timestep i
@@ -234,21 +238,43 @@ for i in range(N):
 
     ''' Step 5: Obtain j(alphaK) for each energy channel '''
 
+    ''' using only one function'''
     ### Ajustar REPT y MagEIS PA flux y calculamos flux at target alphaK
     rept_flux_alphasK, rept_energy, rept_PA_fit_res = psd.step5(PA_fit_info, rept_fedu,rept_channels, rept_bins, rept_N, target_alphasK, 'REPT')
     mageis_flux_alphasK, mageis_energy, mageis_PA_fit_res  = psd.step5(PA_fit_info, mageis_fedu, mageis_channels, mageis_bins, mageis_N, target_alphasK, 'MagEIS')
 
+    rept_fit_opts = [PA_fit_opt if val else None for val in rept_PA_fit_res[0]]
+    mageis_fit_opts = [PA_fit_opt if val else None for val in mageis_PA_fit_res[0]]
+
+    rept_func = [PA_fit_info[2] if val else None for val in rept_PA_fit_res[0]]
+    mageis_func = [PA_fit_info[2] if val else None for val in mageis_PA_fit_res[0]]
+
     ### Checkeamos el fit
     if show:
-        plots_psd.check_step5(PA_fit_info, rept_fedu, rept_bins,
+        plots_psd.check_step5(rept_fit_opts, rept_func, rept_fedu, rept_bins,
                   rept_PA_fit_res, rept_flux_alphasK, target_alphasK, 'REPT')
 
-        plots_psd.check_step5(PA_fit_info, mageis_fedu, mageis_bins,
+        plots_psd.check_step5(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
                   mageis_PA_fit_res, mageis_flux_alphasK, target_alphasK,
                   'MagEIS')
 
     flux_alphasK = [rept_flux_alphasK, mageis_flux_alphasK]
     energy_bins = [rept_energy, mageis_energy]
+
+    ''' Selecting best function'''
+    list_PA_fit_info = [fp.info_fit_PA_flux('1'), fp.info_fit_PA_flux('2')]
+
+    rept_flux_alphasK2, rept_energy2, rept_PA_fit_res2 = psd.step5_V2(list_PA_fit_info, rept_fedu,rept_channels, rept_bins, rept_N, target_alphasK, 'REPT')
+    mageis_flux_alphasK2, mageis_energy2, mageis_PA_fit_res2  = psd.step5_V2(list_PA_fit_info, mageis_fedu, mageis_channels, mageis_bins, mageis_N, target_alphasK, 'MagEIS')
+
+    ### Checkeamos el fit
+    if show:
+        plots_psd.check_step5(rept_PA_fit_res2[5], rept_PA_fit_res2[6], rept_fedu, rept_bins,
+                  rept_PA_fit_res2, rept_flux_alphasK2, target_alphasK, 'REPT')
+
+        plots_psd.check_step5(mageis_PA_fit_res2[5], mageis_PA_fit_res2[6], mageis_fedu, mageis_bins,
+                  mageis_PA_fit_res2, mageis_flux_alphasK2, target_alphasK,
+                  'MagEIS')
 
 
     ''' Step 6: Obtain psd(Emu) using j(alphaK) for each energy '''

@@ -41,9 +41,9 @@ def check_step2(info_K, model_obj, inputs, unit_K, Ks_spline, alphas_spline, spl
     plt.show()
 
 
-def check_step5(fit_info, fedu, energy_bins, fit_results, js_alphasK, alphasK, instrument):
+def check_step5(fit_opts, list_func, fedu, energy_bins, fit_results, js_alphasK, alphasK, instrument):
 
-    plots_fp.check_fit_PA_flux(fit_info, fedu, energy_bins, fit_results,
+    plots_fp.check_fit_PA_flux(fit_opts, list_func, fedu, energy_bins, fit_results,
                                 js_alphasK, alphasK, instrument, '', 1, 0)
 
 
