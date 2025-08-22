@@ -81,6 +81,7 @@ mageis_cut_offs = [1, 14]
 ### Fijamos las opciones para los fits de los flujos
 # Pitch angle (opciones: '1' y '2')
 PA_fit_opt = '2'
+PA_fit_opt = ['1', '2']
 
 # Energía (opciones: ('pl', 'flux'), ('exp', 'psd'), ('spl', 'flux')
 #                    ('spl', 'psd'), ('lin', 'flux'), ('lin', 'psd'))
@@ -134,7 +135,5 @@ plots_psd_calc.psd_lstar(df_psd, df_lstar, target_Ks[0], target_mus[0])
 plots_psd_calc.psd_time(df_psd, target_Ks[0], target_mus[0])
 
 
-'''
-psd_proc.save_psd(save_dir, df_psd, df_lstar, targets, times, flag_model,
+psd_calc.save_psd(save_dir, df_psd, df_lstar, targets, times, flag_model,
                       time_avg, 'storm')
-'''

@@ -198,7 +198,7 @@ def check_fit_energy_data(fit_results, energy_bins, y, fit_info,
 
 
 def check_fit_energy_psd(func, parms, f_Emu, energy_bins, flux_data, fit_info,
-    energy_range, Emu, psd_func, alphaK, unit_c, unit_flux_mev, show=1):
+    energy_range, Emu, psd_func, alphaK, units_psd, show=1):
     fit_opt, str_func, _, _, _ = fit_info
     E_min, E_max = energy_range
 
@@ -208,7 +208,7 @@ def check_fit_energy_psd(func, parms, f_Emu, energy_bins, flux_data, fit_info,
     fig, ax = plt.subplots()
     fig.set_size_inches(10, 6)
     label = 'PSD at target Emu'
-    psd_data = psd_func(energy_bins, flux_data, unit_c, unit_flux_mev)
+    psd_data = psd_func(energy_bins, flux_data, units_psd)
     fit = isinstance(func, bool)
     print(fit)
     if fit:
@@ -220,7 +220,7 @@ def check_fit_energy_psd(func, parms, f_Emu, energy_bins, flux_data, fit_info,
             print('\nChecking flux fit')
             log_j = func(log_energies, *parms)
             j = 10**log_j*flux_data.unit
-            f = psd_func(energies, j, unit_c, unit_flux_mev)
+            f = psd_func(energies, j, units_psd)
         elif fit_opt[1] == 'psd':
             print('\nPSD fitting')
             if fit_opt[0] == 'exp':

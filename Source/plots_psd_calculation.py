@@ -48,7 +48,7 @@ def check_step5(fit_opts, list_func, fedu, energy_bins, fit_results, js_alphasK,
 
 
 def check_step6(js, energy, alphasK, Ks, fit_objects, parameters, df_psd, fit_info,
-                energy_range, Esmu, unit_c, unit_flux, func):
+                energy_range, Esmu, units_psd, func):
 
     for i, alphaK in enumerate(alphasK):
         flux = js[:,i]
@@ -60,7 +60,7 @@ def check_step6(js, energy, alphasK, Ks, fit_objects, parameters, df_psd, fit_in
         plots_fp.energy_y_data('flux', energy, flux, alphaK, '', True, 1, 0)
 
         plots_fp.check_fit_energy_psd(fit_obj, pars, psd, energy, flux,
-                 fit_info, energy_range, Es, func, alphaK, unit_c, unit_flux)
+                 fit_info, energy_range, Es, func, alphaK, units_psd)
 
 
 def psd_lstar(df_psd, df_lstar, K, mu):
