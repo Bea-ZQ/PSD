@@ -69,7 +69,7 @@ def fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_ener
             fit.append(False)
             parameters.append(np.nan)
             err_par.append(np.nan)
-            err_fit.append(np.nan)
+            err_fit.append((np.nan, np.nan))
             max_values.append(np.nan)
         else:
             print('Si vamos a usar este canal de energía')
@@ -90,7 +90,7 @@ def fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_ener
                 fit.append(False)
                 parameters.append(0)
                 err_par.append(np.nan)
-                err_fit.append(np.nan)
+                err_fit.append((np.nan, np.nan))
 
                 continue
             elif np.isnan(max_flux):
@@ -98,7 +98,7 @@ def fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_ener
                 fit.append(False)
                 parameters.append(0)
                 err_par.append(np.nan)
-                err_fit.append(np.nan)
+                err_fit.append((np.nan, np.nan))
 
                 continue
             else:
@@ -116,9 +116,9 @@ def fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_ener
                 fit.append(False)
                 parameters.append(0)
                 err_par.append(np.nan)
-                err_fit.append(np.nan)
+                err_fit.append((np.nan, np.nan))
 
-    return np.array(fit), parameters, max_values*fedu.unit, err_par, err_fit
+    return np.array(fit), parameters, max_values*fedu.unit, err_par, np.array(err_fit)
 
 
 def fitting_alpha_flux_V2(list_info_fit, fedu, channels_to_use, alpha_bins, N_energy):
@@ -140,7 +140,7 @@ def fitting_alpha_flux_V2(list_info_fit, fedu, channels_to_use, alpha_bins, N_en
             parameters.append(np.nan)
             max_values.append(np.nan)
             err_par.append(np.nan)
-            err_fit.append(np.nan)
+            err_fit.append([np.nan, np.nan])
             fit_opts.append(False)
             fit_func.append(False)
         else:
@@ -162,7 +162,7 @@ def fitting_alpha_flux_V2(list_info_fit, fedu, channels_to_use, alpha_bins, N_en
                 fit.append(False)
                 parameters.append(0)
                 err_par.append(np.nan)
-                err_fit.append(np.nan)
+                err_fit.append([np.nan, np.nan])
                 fit_opts.append(False)
                 fit_func.append(False)
                 continue
@@ -171,7 +171,7 @@ def fitting_alpha_flux_V2(list_info_fit, fedu, channels_to_use, alpha_bins, N_en
                 fit.append(False)
                 parameters.append(0)
                 err_par.append(np.nan)
-                err_fit.append(np.nan)
+                err_fit.append([np.nan, np.nan])
                 fit_opts.append(False)
                 fit_func.append(False)
                 continue
@@ -192,7 +192,7 @@ def fitting_alpha_flux_V2(list_info_fit, fedu, channels_to_use, alpha_bins, N_en
                 parameters.append(best['par_opt'])
                 err_par.append('miau')
 #                err_par.append(np.sqrt(np.diag(pcov)))
-                err_fit.append([best['r2'], best['rmse']])
+                err_fit.append([best['rmse'], best['r2']])
                 fit_opts.append(best['opt'])
                 fit_func.append(best['func'])
             else:
@@ -200,11 +200,11 @@ def fitting_alpha_flux_V2(list_info_fit, fedu, channels_to_use, alpha_bins, N_en
                 fit.append(False)
                 parameters.append(0)
                 err_par.append(np.nan)
-                err_fit.append(np.nan)
+                err_fit.append([np.nan, np.nan])
                 fit_opts.append(False)
                 fit_func.append(False)
 
-    return np.array(fit), parameters, max_values*fedu.unit, err_par, err_fit, fit_opts, fit_func
+    return np.array(fit), parameters, max_values*fedu.unit, err_par, np.array(err_fit), fit_opts, fit_func
 
 
 def errors(x,y, par_opt, func):

@@ -288,7 +288,7 @@ def step4(mf_model, inputs, alphasK, info_Lstar, save_lstar):
     return df_lstar
 
 
-def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK, inst):
+def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK, inst, save_errors):
     # Step 5: Interpolar datos j(alpha) para cada canal de energía para obtener
     # flujos en target alphaK
     print('-------------------------------------------------------------------')
@@ -298,6 +298,8 @@ def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK,
 
     func_opt, str_func, func, p0, lims = fit_info
     energy_bins, alpha_bins = list_bins
+    df_rmse, df_r2, index = save_errors
+
     print(f'* Using function {func_opt} for interpolation:')
     print(f'      {str_func}')
     print(f'* Instrumet: {inst}')
@@ -306,6 +308,9 @@ def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK,
         with contextlib.redirect_stdout(fnull):
             fit_results = fp.fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_energy)
     fit, parameters, max_values= fit_results[:3]
+    err_fit = fit_results[4]
+    df_rmse.loc[index, inst] = err_fit[:,0]
+    df_r2.loc[index, inst] = err_fit[:,1]
 
     # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
     array_indexes = np.array(range(N_energy))[fit]
@@ -322,7 +327,7 @@ def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK,
 
 
 
-def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK, inst):
+def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK, inst, save_errors):
     # Step 5: Interpolar datos j(alpha) para cada canal de energía para obtener
     # flujos en target alphaK
     print('-------------------------------------------------------------------')
@@ -331,6 +336,8 @@ def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, al
     print('-------------------------------------------------------------------')
 
     energy_bins, alpha_bins = list_bins
+    df_rmse, df_r2, index = save_errors
+
     print(f'* Using functions best function for interpolation:')
     print(f'      ')
     print(f'* Instrumet: {inst}')
@@ -339,7 +346,9 @@ def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, al
         with contextlib.redirect_stdout(fnull):
             fit_results = fp.fitting_alpha_flux_V2(list_fit_info, fedu, channels_to_use, alpha_bins, N_energy)
 
-    fit, parameters, max_values, _, _, fit_opts, funcs = fit_results
+    fit, parameters, max_values, _, err_fit, fit_opts, funcs = fit_results
+    df_rmse.loc[index, inst] = err_fit[:,0]
+    df_r2.loc[index, inst] = err_fit[:,1]
 
     # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
     array_indexes = np.array(range(N_energy))[fit]
@@ -354,6 +363,7 @@ def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, al
     energy_bins_to_use = energy_bins[fit]
     print()
     return js_alphasK*max_values.unit, energy_bins_to_use, fit_results
+
 
 
 def step6_flux(energy, array_flux, fit_info, Esmu, alphasK, units_psd, save_psd):
@@ -457,15 +467,18 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
     rept_channels = fp.channels_to_use(rept_cut_offs, rept_N)
     mageis_channels = fp.channels_to_use(mageis_cut_offs, mageis_N)
 
-    ### Obtenemos info para los fits de pitch angle y energía.
+    ### Obtenemos info para los fits de pitch angle.
     PA_fit_info = fp.info_fit_PA_flux(PA_fit_opt)
     step5 = step5_onefunc
     if PA_fit_info[2] == None:
         PA_fit_info = [fp.info_fit_PA_flux(x) for x in PA_fit_opt]
         step5 = step5_bestfunc
-    energy_fit_info = fp.info_fit_energy_data(energy_fit_opt)
     print(PA_fit_info)
     print(step5)
+
+    ### Obtenemos info para los fits de energía.
+    energy_fit_info = fp.info_fit_energy_data(energy_fit_opt)
+
     ### Obtenemos función para el cálculo de K y Lstar
     info_K = inv.info_calculate_K(K_opt)
     info_Lstar = inv.info_calculate_Lstar(Lstar_opt)
@@ -477,15 +490,20 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
     elif energy_fit_opt[1] == 'psd':
         step6 = step6_psd
 
-    ### Creamos los dataframes para guardar datos:
+    ### Creamos los dataframes para guardar datos
     labels_Ks = [str(x) for x in target_Ks]
     labels_mus = [str(x) for x in target_mus]
-
-#    columns_lstar = pd.Index(labels_Ks, name='K')
 
     cols = pd.MultiIndex.from_product([labels_Ks, labels_mus], names=['K', 'mu'])
     df_psd = pd.DataFrame(columns = cols)
     df_lstar = pd.DataFrame(columns=cols)
+
+    ### Creamos los dataframes para guardar errores
+    rept_cols = pd.MultiIndex.from_product([['REPT'], range(1, rept_N+1)], names=['Instrument', 'Channel'])
+    mageis_cols = pd.MultiIndex.from_product([['MagEIS'], range(1, mageis_N+1)], names=['Instrument', 'Channel'])
+    all_cols = rept_cols.append(mageis_cols)
+    df_rmse = pd.DataFrame(columns=all_cols)
+    df_r2 = pd.DataFrame(columns=all_cols)
 
     ### Obtenemos los inputs para el cálculo de psd
     x_inputs, mag_inputs = inputs_mf
@@ -507,7 +525,7 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
 
         save_psd = [df_psd, timestamp, target_Ks]
         save_lstar = [df_lstar, timestamp, target_Ks, target_mus]
-
+        save_errors = [df_rmse, df_r2, timestamp]
 
         ###################  Section 1: Calculo de invariantes  ################
 
@@ -531,9 +549,9 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
         ''' Step 5: Obtain j(alphaK) for each energy channel '''
         ### Ajustar REPT y MagEIS PA flux y calculamos flux at target alphaK
         rept = step5(PA_fit_info, rept_fedu, rept_channels, rept_bins, rept_N,
-               target_alphasK, 'REPT')
+               target_alphasK, 'REPT', save_errors)
         mageis  = step5(PA_fit_info, mageis_fedu, mageis_channels, mageis_bins,
-                  mageis_N, target_alphasK, 'MagEIS')
+                  mageis_N, target_alphasK, 'MagEIS', save_errors)
 
         rept_flux_alphasK, rept_energy, _ = rept
         mageis_flux_alphasK, mageis_energy, _ = mageis
@@ -550,54 +568,4 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
         df_psd, _, _ = step6(energy_to_fit, energy_flux_to_fit, energy_fit_info,
                        target_Esmu, target_alphasK, units_psd, save_psd)
 
-    return df_psd, df_lstar
-
-
-
-def save_psd(root_dir, df_psd, df_lstar, targets, times, flag_model, time_avg, type):
-    target_Ks, target_mus = targets
-    start_time, end_time = times
-    stime = pd.to_datetime(start_time)
-
-    if type == 'day':
-        save_dir = os.path.join(root_dir, 'Days', f'{stime.year}', f'{stime.month}', f'{stime.day}', '')
-    elif type == 'storm':
-            save_dir = os.path.join(root_dir, 'Storms', start_time.split()[0].replace('-', '_'), '')
-    else:
-        print('type not valid')
-        return
-
-    if not os.path.exists(os.path.dirname(save_dir)):
-        try:
-            os.makedirs(os.path.dirname(save_dir))
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise
-
-    time_array = df_psd.index
-    for K in target_Ks:
-        for mu in target_mus:
-            psd = df_psd[str(K)][str(mu)].tolist()
-            psd = u.Quantity(psd)
-            lstar = df_lstar[str(K)][str(mu)].tolist()
-            save_name1 = f'{flag_model}_{time_avg}_'
-            save_name2 = f'K_{str(K).replace('(1/2)', '')}_mu_{str(mu).replace(' / ', '_')}.txt'.replace(' ', '_')
-            save_name = save_name1 + save_name2
-            save = os.path.join(save_dir, save_name)
-            str_psd = 'psd'
-            str_lstar = 'lstar'
-
-            df_save = pd.DataFrame(columns = ['time', str_psd, str_lstar])
-            df_save['time'] = time_array
-            df_save[str_psd] = psd.value
-            df_save[str_lstar] = lstar
-
-            header_lines = [f'# Start time: {start_time}', f'# End time: {end_time}',
-                            f'# K = {str(K)} ', f'# mu = {str(mu)}',
-                            f'# Time avg: {time_avg}', f'# Model: {flag_model}',
-                            f'# PSD units: {psd.unit}', '']
-            with open(save, "w") as f:
-                for line in header_lines:
-                    f.write(line + "\n")
-                df_save.to_csv(f, index=False)
-    return df_save
+    return df_psd, df_lstar, df_rmse, df_r2

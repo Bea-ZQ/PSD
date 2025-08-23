@@ -42,9 +42,11 @@ time_avg = '1min'
 
 start_time = '2013-05-30 00:00:00'
 end_time = '2013-05-30 23:59:59'
+type = 'day'
 
-start_time = '2013-05-30 03:00:00'
-end_time = '2013-05-30 07:00:00'
+#start_time = '2013-05-30 03:00:00'
+#end_time = '2013-05-30 07:00:00'
+#type = 'storm'
 
 ### Opciones para el modelo de campo (calcula L* y en coordenadas 1:GEO)
 opt_mf = [1,0,0,0,0]
@@ -126,7 +128,7 @@ inputs, bins = psd_calc.get_inputs(times, sat, data_dirs, flag_dwnl, opts_model,
 ################################################################################
 '''
 
-df_psd, df_lstar = psd_calc.psd_calculation(channels_to_use, opts_psd, opts_model,
+df_psd, df_lstar, df_rmse, df_r2 = psd_calc.psd_calculation(channels_to_use, opts_psd, opts_model,
                    targets, inputs, energy_range, bins, units, N_steps = 10e9)
 
 
@@ -135,5 +137,5 @@ plots_psd_calc.psd_lstar(df_psd, df_lstar, target_Ks[0], target_mus[0])
 plots_psd_calc.psd_time(df_psd, target_Ks[0], target_mus[0])
 
 
-psd_calc.save_psd(save_dir, df_psd, df_lstar, targets, times, flag_model,
-                      time_avg, 'storm')
+psd_proc.save_psd_data(save_dir, df_psd, df_lstar, df_rmse, df_r2, targets, times,
+                  flag_model, time_avg, sat, type)
