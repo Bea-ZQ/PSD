@@ -4,12 +4,13 @@ incorporar de alguna forma los errores
 modificar step 2 y interpolate_alpha_K
 
 
-filtrar valores malos de inputs para el modelo de campo magnético
 qué pasa cuando un target alpha es nan?
 preguntar víctor hro y hro2
 qué pasa si ect tiene menos resolución
-agregar errores
-ver bien cuál es la mejor forma de guardar
+
+
+flitrar inputs magnéticos malos
+target alpha es nan -> arreglar
 
 crear función all steps o steps inv y steps fedu -> esto es para poder paralelizar
 

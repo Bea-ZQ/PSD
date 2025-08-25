@@ -197,15 +197,15 @@ df_lstar = pd.DataFrame(columns=cols)
 
 # Creamos los dataframes para guardar errores
 
-rept_cols = pd.MultiIndex.from_product([['REPT'], range(1, rept_N+1)], names=['Instrument', 'Channel'])
-mageis_cols = pd.MultiIndex.from_product([['MagEIS'], range(1, mageis_N+1)], names=['Instrument', 'Channel'])
-all_cols = rept_cols.append(mageis_cols)
+rept_cols = [f'REPT_{channel}' for channel in range(1, rept_N+1)]
+mageis_cols = [f'MagEIS_{channel}' for channel in range(1, mageis_N+1)]
+all_cols = rept_cols + mageis_cols
 
-df_r2 = pd.DataFrame(columns=all_cols)
 df_rmse = pd.DataFrame(columns=all_cols)
+df_r2 = pd.DataFrame(columns=all_cols)
 
-df_r22 = pd.DataFrame(columns=all_cols)
 df_rmse2 = pd.DataFrame(columns=all_cols)
+df_r22 = pd.DataFrame(columns=all_cols)
 
 # Loop en el tiempo
 N = 2

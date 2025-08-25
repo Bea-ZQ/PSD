@@ -309,8 +309,10 @@ def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK,
             fit_results = fp.fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_energy)
     fit, parameters, max_values= fit_results[:3]
     err_fit = fit_results[4]
-    df_rmse.loc[index, inst] = err_fit[:,0]
-    df_r2.loc[index, inst] = err_fit[:,1]
+
+    cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
+    df_rmse.loc[index, cols] = err_fit[:,0]
+    df_r2.loc[index, cols] = err_fit[:,1]
 
     # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
     array_indexes = np.array(range(N_energy))[fit]
@@ -347,9 +349,11 @@ def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, al
             fit_results = fp.fitting_alpha_flux_V2(list_fit_info, fedu, channels_to_use, alpha_bins, N_energy)
 
     fit, parameters, max_values, _, err_fit, fit_opts, funcs = fit_results
-    df_rmse.loc[index, inst] = err_fit[:,0]
-    df_r2.loc[index, inst] = err_fit[:,1]
 
+    cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
+    df_rmse.loc[index, cols] = err_fit[:,0]
+    df_r2.loc[index, cols] = err_fit[:,1]
+    
     # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
     array_indexes = np.array(range(N_energy))[fit]
     js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
@@ -499,9 +503,9 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
     df_lstar = pd.DataFrame(columns=cols)
 
     ### Creamos los dataframes para guardar errores
-    rept_cols = pd.MultiIndex.from_product([['REPT'], range(1, rept_N+1)], names=['Instrument', 'Channel'])
-    mageis_cols = pd.MultiIndex.from_product([['MagEIS'], range(1, mageis_N+1)], names=['Instrument', 'Channel'])
-    all_cols = rept_cols.append(mageis_cols)
+    rept_cols = [f'REPT_{channel}' for channel in range(1, rept_N+1)]
+    mageis_cols = [f'MagEIS_{channel}' for channel in range(1, mageis_N+1)]
+    all_cols = rept_cols + mageis_cols
     df_rmse = pd.DataFrame(columns=all_cols)
     df_r2 = pd.DataFrame(columns=all_cols)
 

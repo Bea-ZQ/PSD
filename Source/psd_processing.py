@@ -8,7 +8,7 @@ from astropy import units as u
 import pandas as pd
 
 
-def get_save_dir(root_dir, start_time, end_time, type):
+def get_save_dir(root_dir, start_time, type, create=True):
 
     stime = pd.to_datetime(start_time)
 
@@ -19,13 +19,13 @@ def get_save_dir(root_dir, start_time, end_time, type):
     else:
         print('type not valid')
         return 0
-
-    if not os.path.exists(os.path.dirname(save_dir)):
-        try:
-            os.makedirs(os.path.dirname(save_dir))
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise
+    if create:
+        if not os.path.exists(os.path.dirname(save_dir)):
+            try:
+                os.makedirs(os.path.dirname(save_dir))
+            except OSError as exc:
+                if exc.errno != errno.EEXIST:
+                    raise
     return save_dir
 
 
@@ -48,7 +48,7 @@ def save_df(save, df_save, lines):
 def save_psd_data(root_dir, df_psd, df_lstar, df_rmse, df_r2, targets, times, flag_model, time_avg, sat, type):
     target_Ks, target_mus = targets
     start_time, end_time = times
-    save_dir = get_save_dir(root_dir, start_time, end_time, type)
+    save_dir = get_save_dir(root_dir, start_time, type)
 
     if save_dir == 0:
         return
@@ -86,21 +86,16 @@ def save_psd_data(root_dir, df_psd, df_lstar, df_rmse, df_r2, targets, times, fl
     return
 
 
-def read_psd(root_dir, K, mu, start_time, flag_model, time_avg, type):
+def read_psd(root_dir, K, mu, start_time, flag_model, time_avg, sat, type):
     stime = pd.to_datetime(start_time)
-    if type == 'day':
-        data_dir = os.path.join(root_dir, 'Days', f'{stime.year}', f'{stime.month}', f'{stime.day}', '')
-    elif type == 'storm':
-        #ESTO NSE PUEDE HACER COMO EL CASO DE ARRIBA
-        data_dir = os.path.join(root_dir, 'Storms', f'{stime.year}_{stime.month}_{stime.day}', '')
-    else:
-        print('type not valid')
+    data_dir = get_save_dir(root_dir, start_time, type, create=False)
+    if data_dir == 0:
         return
+    name = get_save_name(flag_model, time_avg, sat, K, mu)
 
-    name_1 = f'{flag_model}_{time_avg}_'
-    name_2 = f'K_{str(K).replace('(1/2)', '')}_mu_{str(mu).replace(' / ', '_')}.txt'.replace(' ', '_')
-    name = name_1 + name_2
-    file = os.path.join(data_dir, name)
+    file = os.path.join(data_dir, name+'.txt')
+    file_rmse = os.path.join(data_dir, name+'_rmse.txt')
+    file_r2 = os.path.join(data_dir, name+'_r2.txt')
 
     with open(file, 'r') as f:
         for line in f:
@@ -109,12 +104,20 @@ def read_psd(root_dir, K, mu, start_time, flag_model, time_avg, type):
                 break
 
     df = pd.read_csv(file, header = 7)
+    df_rmse = pd.read_csv(file_rmse, skiprows=6)
+    df_r2 = pd.read_csv(file_r2, skiprows=6)
     df['time'] = pd.to_datetime(df['time'])
-    return df, unit_psd
+    df_rmse['time'] = pd.to_datetime(df_rmse['time'])
+    df_r2['time'] = pd.to_datetime(df_r2['time'])
+    return df, unit_psd, df_rmse, df_r2
 
 
-def clean_psd(df):
-    df_clean = df.dropna(axis = 0, how='any')
-    df_clean = df_clean[df_clean['psd'] >= 10e-13]
-    df_clean = df_clean[df_clean['psd'] <= 10]
-    return df_clean
+def clean_psd(df_psd, df_rmse, df_r2):
+    df_psd_clean = df_psd.dropna(axis = 0, how='any')
+    df_psd_clean = df_psd_clean[df_psd_clean['psd'] >= 10e-13]
+    df_psd_clean = df_psd_clean[df_psd_clean['psd'] <= 10]
+
+    df_rmse_clean = df_rmse.loc[df_psd_clean.index]
+    df_r2_clean = df_r2.loc[df_psd_clean.index]
+
+    return df_psd_clean, df_rmse_clean, df_r2_clean

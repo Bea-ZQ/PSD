@@ -63,7 +63,6 @@ units_psd = get_units.psd()
 
 _, _, unit_K, unit_mu = units_inv
 target_mus = [0.02, 0.01]*unit_mu
-target_mus = [0.01]*unit_mu
 target_Ks = [60, 100, 200, 40]*unit_K
 target_Ks = [100, 80]*unit_K
 
