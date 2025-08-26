@@ -50,23 +50,32 @@ def K_drift_bounce(alphas, model, inputs, unit_K):
     x_input, mag_input = inputs
     Ks  = []
     bs_mirr = []
+    bs_mirr2 = []
     alphas =alphas.value
 
     R0=1
     for i in range(len(alphas)):
-        #print('Alpha: ', alphas[i])
+#        print('Alpha: ', alphas[i])
         dict_bounce = model.drift_bounce_orbit(x_input, mag_input, alphas[i], R0)
         bmirr = dict_bounce['bmirr']
         bs_mirr.append(bmirr)
+
+#        dict_mirror = model.find_mirror_point(x_input, mag_input, alphas[i])
+#        bmirr2 = dict_mirror['bmin']      # Campo magnético en el punto mirror
+#        bs_mirr2.append(bmirr2)
+
         #print('b_mirr: ', bmirr)
         I_alpha = dict_bounce['xj']
         #print('I: ', I_alpha)
-
-        K_alpha = I_alpha*np.sqrt(bmirr)  # Unidades de Re*(nT**(1/2))
+        if bmirr >=0:
+            K_alpha = I_alpha*np.sqrt(bmirr)  # Unidades de Re*(nT**(1/2))
+        else:
+            print('bmirr is negativo')
+            K_alpha = np.nan
+            print(K_alpha)
         #print('K: ', K_alpha)
         Ks.append(K_alpha)
         #print('----------------')
-
     return Ks*unit_K, bs_mirr*u.nT
 
 

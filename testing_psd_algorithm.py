@@ -22,9 +22,10 @@ import pandas as pd
 from astropy import units as u
 from astropy import constants as const
 import matplotlib.pyplot as plt
+import time
 
 import numpy as np
-#import IRBEM
+import IRBEM
 
 '''
 ################################################################################
@@ -129,10 +130,10 @@ sdate_omni_1h, sdate_omni_min, edate_omni = mf.get_omni_dates(sdate, edate)
 ect_var = mf.model_variables_ect(model)
 omni_var = mf.model_variables_omni(model, resolution)
 [var_ect, rename_ect] = ect_var
-[var_omni_1h, var_omni_min, rename_omni] = omni_var
+[var_omni_1h, var_omni_min, rename_omni, range_omni] = omni_var
 
 ### Creamos el objeto de campo magnético T89
-#model_obj = IRBEM.MagFields(options=options, kext=model, verbose = False, sysaxes=1)
+model_obj = IRBEM.MagFields(options=options, kext=model, verbose = False, sysaxes=1)
 
 
 '''
@@ -220,9 +221,23 @@ rept_info, rept_fedus = mf.time_average_ect_data(rept_info, rept_fedu, sdate, ed
 
 ect_info = mf.sync_ect_data(rept_info, mageis_info)
 
-### Creamos los inputs
-x_inputs, mag_inputs, N = mf.create_inputs_MF(ect_info, omni_info, R_earth, sdate, edate)
 
+### Creamos los inputs
+
+# datos ect
+dates, xs_geo, ys_geo, zs_geo = mf.get_GEO_coordinates(ect_info, R_earth)
+x_inputs, N = mf.dicts_x_input(dates, xs_geo, ys_geo, zs_geo)
+
+# datos omni
+delta = pd.Timedelta(days=1)
+omni_filt2 = mf.filter_dates(omni_info, sdate, edate, delta)
+omni_filt = mf.filter_dates(omni_info, sdate, edate, delta)
+omni_filt = mf.filter_mf_inputs(omni_filt, range_omni)
+
+print(omni_filt)
+print(omni_filt.iloc[-1])
+mag_inputs = mf.dicts_magnetic_input(dates, omni_filt)
+mag_inputs2 = mf.dicts_magnetic_input(dates, omni_filt2)
 ### Chequeamos que estén bien creados
 mf.check_x_inputs(x_inputs, ect_info, R_earth)
 mf.check_mag_inputs(mag_inputs, omni_info, ect_info, resolution)
@@ -254,6 +269,8 @@ i=0
 x_input = x_inputs[i]
 mag_input = mag_inputs[i]
 inputs = [x_input, mag_input]
+mag_input2 = mag_inputs2[i]
+inputs2 = [x_input, mag_input2]
 print(x_input)
 
 rept_fedu = rept_fedus_input[i]
@@ -310,7 +327,7 @@ func_K, _, _ = inv.info_calculate_K(K_opt)
 
 
 '''                    Section 1: Calculo de invariantes                 '''
-'''
+
 ######## Step 1: Calcular K para distintos PA alphas, usando drift_bounce_orbit
 
 # Array de PAs en grados
@@ -322,7 +339,12 @@ alphas = np.linspace(3, 90, 40)*u.degree
 # Obtenemos los valores de K para cada arreglo de PA en unidades de Re*(nT**(1/2))
 #Ks_lin, _ = func_K(alphas_lin, model_obj, inputs, unit_K)
 #Ks_geom, _ = func_K(alphas_geom, model_obj, inputs, unit_K)
-Ks, _ = func_K(alphas, model_obj, inputs, unit_K)
+start = time.perf_counter()
+Ks, bs_mirr= func_K(alphas, model_obj, inputs, unit_K)
+end = time.perf_counter()
+print(f'Tiempo: {end - start:.6f} segundos. Model {model}')
+
+Ks2, bs_mirr2= func_K(alphas, model_obj, inputs2, unit_K)
 #Ks_plot, _ = func_K(alphas_plot, model_obj, inputs, unit_K)
 
 
@@ -397,7 +419,7 @@ target_Emu = inv.calculate_E(target_mu, b_mag, target_alphaK)
 func_Lstar, _, _ = inv.info_calculate_Lstar(Lstar_opt)
 lstar = func_Lstar(target_alphaK, model_obj, inputs)
 
-'''
+
 '''                      Section 2: FEDU processing                      '''
 target_alphaK = 38.48988795*u.degree
 target_Emu = 2.75217844*u.MeV
@@ -428,6 +450,7 @@ mageis_channels = fp.channels_to_use(mageis_cut_offs, mageis_N)
 
 ''' Solo una función fit PA '''
 print('ONE FUNCTION')
+'''
 # Obtenemos el mejor ajuste, usando solo una función determinada de antes
 rept_PA_fit_res = fp.fitting_alpha_flux(*PA_fit_info[2:], rept_fedu,
                   rept_channels, rept_alpha_bins, rept_N)
@@ -449,9 +472,9 @@ mageis_flux_alphaK = fp.fitted_flux_at_alphaK(mageis_PA_fit_res, mageis_func, ta
 
 flux_alphaK = [rept_flux_alphaK, mageis_flux_alphaK]
 energy_bins = [rept_energy_bins[rept_fit], mageis_energy_bins[mageis_fit]]
-
+'''
 ### Checkeamos el fit
-
+'''
 plots_fp.check_fit_PA_flux(rept_fit_opts, rept_func, rept_fedu, rept_bins, rept_PA_fit_res,
          rept_flux_alphaK, target_alphaK, 'REPT', plots_dir, show_flag, save_flag)
 
@@ -459,10 +482,11 @@ plots_fp.check_fit_PA_flux(rept_fit_opts, rept_func, rept_fedu, rept_bins, rept_
 plots_fp.check_fit_PA_flux(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
          mageis_PA_fit_res, mageis_flux_alphaK, target_alphaK, 'MagEIS',
          plots_dir, show_flag, save_flag)
-
+'''
 ''' Selecciona la mejor función para fir PA '''
 # Obtenemos el mejor ajuste, probando las 2 posibles funciones
 
+'''
 print('BEST FUNCTION')
 list_PA_fit_info = [fp.info_fit_PA_flux('1'), fp.info_fit_PA_flux('2')]
 
@@ -478,8 +502,9 @@ mageis_fit2, _, _, mageis_err2, mageis_err_fit2, mageis_fit_opts2, mageis_func2 
 
 rept_flux_alphaK2 = fp.fitted_flux_at_alphaK(rept_PA_fit_res2, rept_func2, target_alphaK)
 mageis_flux_alphaK2 = fp.fitted_flux_at_alphaK(mageis_PA_fit_res2, mageis_func2, target_alphaK)
-
+'''
 ### Checkeamos el fit
+'''
 plots_fp.check_fit_PA_flux(rept_fit_opts2, rept_func2, rept_fedu, rept_bins, rept_PA_fit_res2,
          rept_flux_alphaK2, target_alphaK, 'REPT', plots_dir, show_flag, save_flag)
 
@@ -487,7 +512,7 @@ plots_fp.check_fit_PA_flux(rept_fit_opts2, rept_func2, rept_fedu, rept_bins, rep
 plots_fp.check_fit_PA_flux(mageis_fit_opts2, mageis_func2, mageis_fedu, mageis_bins,
          mageis_PA_fit_res2, mageis_flux_alphaK2, target_alphaK, 'MagEIS',
          plots_dir, show_flag, save_flag)
-
+'''
 #poster.step5(PA_fit_info, rept_fedu, rept_bins, rept_PA_fit_res, rept_flux_alphaK, target_alphaK, 0)
 #poster.step5(PA_fit_info, mageis_fedu, mageis_bins, mageis_PA_fit_res, mageis_flux_alphaK, target_alphaK, 13)
 

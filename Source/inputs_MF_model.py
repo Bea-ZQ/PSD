@@ -37,16 +37,19 @@ def model_variables_ect(mf_flag):
     return var_ect, rename_ect
 
 
-def model_variables_omni(mf_flag, resolution):
 
+def model_variables_omni(mf_flag, resolution):
+    # https://prbem.github.io/IRBEM/api/general_information.html
     if mf_flag == 'T89':
         print('T89')
         var_omni_hour = ['Epoch', 'KP']
         var_omni_min = []
         rename_omni = {'Epoch':'epoch', 'KP': 'Kp'}
+        range = {'Kp': (0,90)}
 
     elif mf_flag == 'T96':
         print('T96')
+
         if resolution != '1h':
             var_omni_min = ['Epoch', 'Pressure', 'BY_GSM', 'BZ_GSM']
             var_omni_hour = ['Epoch','DST']
@@ -55,10 +58,24 @@ def model_variables_omni(mf_flag, resolution):
             var_omni_min = []
 
         rename_omni = {'Pressure': 'Pdyn', 'BY_GSM': 'ByIMF', 'BZ_GSM': 'BzIMF',
-                      'Epoch': 'epoch', 'DST': 'Dst'}
+                       'Epoch': 'epoch', 'DST': 'Dst'}
 
-    return var_omni_hour, var_omni_min, rename_omni
+        range = {'Pdyn': (0.5, 10), 'ByIMF': (-10, 10), 'BzIMF': (-10, 10),
+                 'Dst': (-100, 20)}
 
+    return var_omni_hour, var_omni_min, rename_omni, range
+
+
+def filter_mf_inputs(omni, range_omni):
+    for key, value in range_omni.items():
+        print(f'{key}, {value}')
+        mask_min = omni[key] < value[0]
+        mask_max = omni[key] > value[1]
+
+        omni.loc[mask_min, key] = value[0]
+        omni.loc[mask_max, key] = value[1]
+
+    return omni
 
 def sync_omni_data(data_1h, data_min, resolution):
     omni_1h, omni_meta_1h = data_1h
@@ -176,20 +193,6 @@ def dicts_magnetic_input(dates_ect, df_omni):
 
     return list_mag_inputs
 
-
-def create_inputs_MF(ect_info, omni_info, Re, sdate, edate):
-
-    # datos ect
-    dates, xs_geo, ys_geo, zs_geo = get_GEO_coordinates(ect_info, Re)
-    list_x_inputs, N = dicts_x_input(dates, xs_geo, ys_geo, zs_geo)
-
-    # datos omni
-    delta = pd.Timedelta(days=1)
-    omni_filt = filter_dates(omni_info, sdate, edate, delta)
-    print(omni_filt.iloc[-1])
-    list_mag_inputs = dicts_magnetic_input(dates, omni_filt)
-
-    return (list_x_inputs, list_mag_inputs, N)
 
 
 ########################### Funciones de checkeo ###############################

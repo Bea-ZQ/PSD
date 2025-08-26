@@ -76,8 +76,8 @@ for i, K in enumerate(target_Ks):
         list_mus.append((df_psd_clean, df_rmse_clean, df_r2_clean, label_mu+str(mu)))
     dict_dfs_Ks[K] = list_mus
 
-#plots_psd_proc.psd_lstar_list_inv(dict_dfs_Ks[K], label_K+str(K), colors, unit_psd)
-#plots_psd_proc.psd_time_list_inv(dict_dfs_Ks[K], label_K+str(K), colors, unit_psd)
+plots_psd_proc.psd_lstar_list_inv(dict_dfs_Ks[K], label_K+str(K), colors, unit_psd)
+plots_psd_proc.psd_time_list_inv(dict_dfs_Ks[K], label_K+str(K), colors, unit_psd)
 '''
 
 dict_dfs_mus = {}
@@ -96,8 +96,8 @@ for i, mu in enumerate(target_mus):
 #plots_psd_proc.psd_time_list_inv(dict_dfs_mus[mu], label_mu+str(mu), colors, unit_psd)
 '''
 
-plots_psd_proc.psd_lstar(df_psd_clean, df_rmse_clean, df_r2_clean, K, mu, unit_psd, True, ['REPT_1', 'MagEIS_1'])
-plots_psd_proc.psd_time(df_psd_clean, df_rmse_clean, df_r2_clean,  K, mu, unit_psd, True, ['REPT_1', 'MagEIS_1'])
+#plots_psd_proc.psd_lstar(df_psd_clean, df_rmse_clean, df_r2_clean, K, mu, unit_psd, True, ['REPT_1', 'MagEIS_1'])
+#plots_psd_proc.psd_time(df_psd_clean, df_rmse_clean, df_r2_clean,  K, mu, unit_psd, True, ['REPT_1', 'MagEIS_1'])
 
 
 
@@ -107,7 +107,7 @@ plots_psd_proc.psd_time(df_psd_clean, df_rmse_clean, df_r2_clean,  K, mu, unit_p
 ###           Aplicamos algoritmo para calcular PSD for each timestamp       ###
 ################################################################################
 '''
-
+'''
 day = '2013-05-30'
 times = ['03:00:00', '07:45:00', '12:15:00', '16:45:00']
 delta = pd.Timedelta('4h')
@@ -127,3 +127,4 @@ for time in times:
     dfs.append((df_psd_filt, df_rmse_filt, df_r2_filt, stime))
 
 plots_psd_proc.psd_lstar_list_times(dfs, K, mu, colors, unit_psd)
+'''

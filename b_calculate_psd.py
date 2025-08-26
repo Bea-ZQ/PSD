@@ -27,7 +27,7 @@ save_dir = str(cwd_path.parents[1]/'Data'/'PSD'/'')
 flag_dwnl= False
 
 ### Modelo campo magnético a usar (opciones: T89, T96)
-flag_model = 'T89'
+flag_model = 'T96'
 
 ### Resolución datos omni a usar
 res_omni = '1h'
@@ -40,13 +40,13 @@ time_avg = '1min'
 #start_time = '2013-02-28 18:15:00'
 #end_time = '2013-03-03 11:23:00'
 
-start_time = '2013-05-30 00:00:00'
-end_time = '2013-05-30 23:59:59'
-type = 'day'
+#start_time = '2013-05-30 00:00:00'
+#end_time = '2013-05-30 23:59:59'
+#type = 'day'
 
-#start_time = '2013-05-30 03:00:00'
-#end_time = '2013-05-30 07:00:00'
-#type = 'storm'
+start_time = '2013-05-30 03:00:00'
+end_time = '2013-05-30 07:00:00'
+type = 'storm'
 
 ### Opciones para el modelo de campo (calcula L* y en coordenadas 1:GEO)
 opt_mf = [1,0,0,0,0]

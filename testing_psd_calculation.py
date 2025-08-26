@@ -31,7 +31,7 @@ import IRBEM
 flag_dwnl= False
 
 ### Modelo campo magnético a usar (opciones: T89, T96)
-flag_model = 'T89'
+flag_model = 'T96'
 
 ### Resolución datos omni a usar
 res_omni = '1h'
@@ -145,12 +145,12 @@ rept_fedus, rept_bins = rept
 mageis_fedus, mageis_bins = mageis
 
 ### OMNI
-omni_info, omni_meta = psd.step0_get_OMNI_data(start_time, end_time, data_dir_omni,
+omni_info, omni_meta, omni_range = psd.step0_get_OMNI_data(start_time, end_time, data_dir_omni,
                        res_omni, file_type_omni, flag_dwnl, flag_model)
 
 ### Creamos los inputs
 inputs_mf, inputs_fedus, N = psd.step0_inputs(ect_info, omni_info, start_time,
-                             end_time, res_omni, rept_fedus, mageis_fedus,
+                             end_time, res_omni, omni_range, rept_fedus, mageis_fedus,
                              units)
 
 x_inputs, mag_inputs = inputs_mf
@@ -182,7 +182,7 @@ elif energy_fit_opt[1] == 'psd':
 # Array de PAs en grados
 alphas_right = np.geomspace(30, 90, 21)[1:]*u.degree
 alphas_left = np.geomspace(30, 3, 20)[::-1]*u.degree
-alphas = np.concatenate([alphas_left, alphas_right])
+alphas_total = np.concatenate([alphas_left, alphas_right])
 
 # Creamos los dataframes para guardar datos:
 labels_Ks = [str(x) for x in target_Ks]
@@ -227,7 +227,7 @@ for i in range(N):
 
     ''' Step 1: Calcular K para distintos PA alphas '''
     ### Obtenemos los valores de K para el arreglo de PA en unidades de Re*(nT**(1/2))
-    alphas, Ks = psd.step1(model_obj, inputs, alphas, info_K, unit_K)
+    alphas, Ks = psd.step1(model_obj, inputs, alphas_total, info_K, unit_K)
 
     ''' Step 2: Interpolar la función alpha(K) y calcular target alpha_K '''
     target_alphasK, spline, K_min, K_max = psd.step2(alphas, Ks, target_Ks)

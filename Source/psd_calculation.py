@@ -105,7 +105,7 @@ def step0_get_OMNI_data(stime, etime, data_dir, resolution, file_type,
         print('* No download')
 
     ### Variables omni según resolución y modelo de campo magnético
-    var_1h, var_min, rename = mf.model_variables_omni(flag_model, resolution)
+    var_1h, var_min, rename, range = mf.model_variables_omni(flag_model, resolution)
 
     ### OMNI
     omni_1h = pp_omni.load_CDFfiles_OMNI(sdate_omni_1h, edate_omni, data_dir,
@@ -119,10 +119,10 @@ def step0_get_OMNI_data(stime, etime, data_dir, resolution, file_type,
     ### Juntamos info omni resolución de 1 hour & min
     omni_info, omni_meta = mf.sync_omni_data(omni_1h, omni_min, resolution)
 
-    return omni_info, omni_meta
+    return omni_info, omni_meta, range
 
 
-def step0_inputs(ect_info, omni_info, stime, etime, res_omni,
+def step0_inputs(ect_info, omni_info, stime, etime, res_omni, range_omni,
     rept_fedus, mageis_fedus, units):
 
     units_inv, units_flux, _ = units
@@ -136,9 +136,11 @@ def step0_inputs(ect_info, omni_info, stime, etime, res_omni,
     dates, xs_geo, ys_geo, zs_geo = mf.get_GEO_coordinates(ect_filt, Re)
     list_x_inputs, N = mf.dicts_x_input(dates, xs_geo, ys_geo, zs_geo)
 
-    # datos omni
+    # Datos omni
     delta_omni = pd.Timedelta(res_omni)
     omni_filt = mf.filter_dates(omni_info, stime, etime, delta_omni)
+    omni_filt = mf.filter_mf_inputs(omni_filt, range_omni)
+
     list_mag_inputs = mf.dicts_magnetic_input(dates, omni_filt)
 
     # Unidades para fedus de REPT y MagEIS
@@ -166,13 +168,13 @@ def get_inputs(times, sat, data_dirs, flag_dwnl, opts_model, time_avg, res_omni,
     mageis_fedus, mageis_bins = mageis
 
     # OMNI
-    omni_info, omni_meta = step0_get_OMNI_data(start_time, end_time,
+    omni_info, omni_meta, omni_range = step0_get_OMNI_data(start_time, end_time,
                            data_dir_omni, res_omni, file_type_omni, flag_dwnl,
                            flag_model)
 
     ### Creamos los inputs
     inputs = step0_inputs(ect_info, omni_info, start_time, end_time, res_omni,
-             rept_fedus, mageis_fedus, units)
+             omni_range, rept_fedus, mageis_fedus, units)
 
     return inputs, [rept_bins, mageis_bins]
 
@@ -193,7 +195,7 @@ def step1(mf_model, inputs, alphas, info_K, unit_K):
     with open(os.devnull, 'w') as fnull:
         with contextlib.redirect_stdout(fnull), contextlib.redirect_stderr(fnull):
             Ks, _ = func_K(alphas, mf_model, inputs, unit_K)
-
+#    Ks, _ = func_K(alphas, mf_model, inputs, unit_K)
     ### Limpiamos datos nan
     mask = np.isnan(Ks.value)
     Ks = Ks[~mask]
@@ -353,7 +355,7 @@ def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, al
     cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
     df_rmse.loc[index, cols] = err_fit[:,0]
     df_r2.loc[index, cols] = err_fit[:,1]
-    
+
     # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
     array_indexes = np.array(range(N_energy))[fit]
     js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
@@ -461,7 +463,7 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
     # Array de PAs en grados
     alphas_right = np.geomspace(30, 90, N_alphas +1)[1:]*u.degree
     alphas_left = np.geomspace(30, 3, N_alphas)[::-1]*u.degree
-    alphas = np.concatenate([alphas_left, alphas_right])
+    alphas_total = np.concatenate([alphas_left, alphas_right])
 
     energy_range = energy_range*u.MeV
     _, _, unit_K, _ = units_inv
@@ -534,8 +536,9 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
         ###################  Section 1: Calculo de invariantes  ################
 
         ''' Step 1: Calcular K para distintos PA alphas '''
-        alphas, Ks = step1(model_obj, inputs, alphas, info_K, unit_K)
-
+        alphas, Ks = step1(model_obj, inputs, alphas_total, info_K, unit_K)
+        print(alphas)
+        print(Ks)
         ''' Step 2: Interpolar la función alpha(K) y calcular target alpha_K '''
         target_alphasK, spline, K_min, K_max = step2(alphas, Ks, target_Ks)
 

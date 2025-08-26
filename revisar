@@ -1,16 +1,17 @@
-Agregar datos de emfisis -> Domingo porque necesito ayuda de  César
-
-incorporar de alguna forma los errores
-modificar step 2 y interpolate_alpha_K
+Agregar datos de emfisis
+Error asociado al campo magnético
+guía para github
 
 
 qué pasa cuando un target alpha es nan?
-preguntar víctor hro y hro2
+preguntar hro y hro2
 qué pasa si ect tiene menos resolución
+Paralelizar el código
 
 
-flitrar inputs magnéticos malos
+
 target alpha es nan -> arreglar
+Agregar otro modelo TS
 
 crear función all steps o steps inv y steps fedu -> esto es para poder paralelizar
 
