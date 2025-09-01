@@ -81,8 +81,12 @@ def check_fit_PA_flux(fit_opts, list_func, fedu, list_bins, fit_results, js_alph
             max_val = max_values[i]
             opt = fit_opts[i]
             func = list_func[i]
+            if np.all(np.isnan(alphaK)):
+                j_plot = np.full(np.shape(alphaK), np.nan)
+            else:
+                j_plot = js_alphaK[j]
             fig, ax = PA_flux_function(opt, title, func, par_opt, max_val, '', 0, 0)
-            ax.plot(alphaK, js_alphaK[j], 'o', color = 'r', label = 'Fitted flux')
+            ax.plot(alphaK, j_plot, 'o', color = 'r', label = 'Fitted flux')
             j+=1
         else:
             opt = fit_opts[i]

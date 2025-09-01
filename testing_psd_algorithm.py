@@ -15,6 +15,7 @@ import Source.invariants_calculation as inv
 import Source.plots_invariants_calculation as plots_inv
 import Source.plots_irbem_magnetic_field as plots_irb
 import plots_poster_PSD_algorithm as poster
+import Source.get_units as get_units
 
 import os
 import pathlib
@@ -57,18 +58,19 @@ sat = 'a'
 
 ### Valores de testeo para K, alphaK, mu y Emu.
 # Fijar a priori un valor para alphaK y Emu no está bien (hay que modificarlo cuando sección 1 está lista)
-target_mu = 0.02
-target_K = 100
-
+target_mu = 0.01
+#target_K = 500
+target_K = 80
+#target_K = 100
 # Rangos de energía para los plots
-E_min = 0.02*u.MeV # MeV
+E_min = 0.01*u.MeV # MeV
 E_max = 15*u.MeV # MeV
 energy_range_plot = [E_min, E_max]
 
 
 ### Cut offs canales de energía (para que no los usen)
 # Rept tiene 12 canales de energía
-rept_cut_offs = [1, 11]
+rept_cut_offs = [1, 12]
 # mageis tiene 25 canales de energía
 mageis_cut_offs = [1, 14]
 
@@ -113,7 +115,7 @@ unit_flux_mev =(u.cm**(2)*u.s*u.sr*u.MeV)**(-1)
 unit_flux_kev =(u.cm**(2)*u.s*u.sr*u.keV)**(-1)
 
 unit_c = u.def_unit('c', const.c)
-
+units_psd = get_units.psd()
 
 '''
 ################################################################################
@@ -230,14 +232,14 @@ x_inputs, N = mf.dicts_x_input(dates, xs_geo, ys_geo, zs_geo)
 
 # datos omni
 delta = pd.Timedelta(days=1)
-omni_filt2 = mf.filter_dates(omni_info, sdate, edate, delta)
+#omni_filt2 = mf.filter_dates(omni_info, sdate, edate, delta)
 omni_filt = mf.filter_dates(omni_info, sdate, edate, delta)
 omni_filt = mf.filter_mf_inputs(omni_filt, range_omni)
 
-print(omni_filt)
+#print(omni_filt)
 print(omni_filt.iloc[-1])
 mag_inputs = mf.dicts_magnetic_input(dates, omni_filt)
-mag_inputs2 = mf.dicts_magnetic_input(dates, omni_filt2)
+#mag_inputs2 = mf.dicts_magnetic_input(dates, omni_filt2)
 ### Chequeamos que estén bien creados
 mf.check_x_inputs(x_inputs, ect_info, R_earth)
 mf.check_mag_inputs(mag_inputs, omni_info, ect_info, resolution)
@@ -265,13 +267,13 @@ mageis_fedus_inputs = mageis_fedus*unit_flux_kev
 
 # Elegimos un set de inputs para un tiempo determinado
 #i = 180
-i=0
+i=201
 x_input = x_inputs[i]
 mag_input = mag_inputs[i]
 inputs = [x_input, mag_input]
-mag_input2 = mag_inputs2[i]
-inputs2 = [x_input, mag_input2]
-print(x_input)
+#mag_input2 = mag_inputs2[i]
+#inputs2 = [x_input, mag_input2]
+#print(x_input)
 
 rept_fedu = rept_fedus_input[i]
 mageis_fedu = mageis_fedus_inputs[i]
@@ -334,7 +336,7 @@ func_K, _, _ = inv.info_calculate_K(K_opt)
 #alphas_lin = np.linspace(55, 90, 20)*u.degree
 #alphas_geom = np.geomspace(3, 55, 20)*u.degree
 alphas = np.linspace(3, 90, 40)*u.degree
-#alphas_plot = np.linspace(0, 90, 100)*u.degree
+alphas_plot = np.linspace(0, 90, 100)*u.degree
 
 # Obtenemos los valores de K para cada arreglo de PA en unidades de Re*(nT**(1/2))
 #Ks_lin, _ = func_K(alphas_lin, model_obj, inputs, unit_K)
@@ -344,7 +346,7 @@ Ks, bs_mirr= func_K(alphas, model_obj, inputs, unit_K)
 end = time.perf_counter()
 print(f'Tiempo: {end - start:.6f} segundos. Model {model}')
 
-Ks2, bs_mirr2= func_K(alphas, model_obj, inputs2, unit_K)
+#Ks2, bs_mirr2= func_K(alphas, model_obj, inputs2, unit_K)
 #Ks_plot, _ = func_K(alphas_plot, model_obj, inputs, unit_K)
 
 
@@ -379,7 +381,10 @@ K_max = Ks[0]
 
 # Obtenemos el valor de alpha para el target K
 #target_alphaK = inv.interpolate_alpha_K(target_K, spline_to_use)
-target_alphaK = inv.interpolate_alpha_K(target_K, spline)
+target_alphaK = inv.interpolate_alpha_K(target_K, K_max, spline)
+#if target_K > K_max:
+#    print('No hay partículas atrapadas con ese K')
+#    target_alphaK = np.nan*u.deg
 
 # Visualizaciones
 #list1_Ks = [Ks_plot, Ks_lin, Ks_geom]
@@ -391,7 +396,7 @@ target_alphaK = inv.interpolate_alpha_K(target_K, spline)
 #plots_inv.interpolation_alpha_K(list1_Ks, list1_alphas, [spline_lin, spline_geom], K_min, K_max, K_lim)
 #plots_inv.interpolation_alpha_K(list2_Ks, list2_alphas, [spline], K_min, K_max)
 #poster.step2(list1_Ks, list1_alphas, [spline_lin, spline_geom], target_K, target_alphaK, K_min, K_max, K_lim, save=0)
-#poster.step2(list2_Ks, list2_alphas, [spline], target_K, target_alphaK2, K_min, K_max)
+#poster.step2(list2_Ks, list2_alphas, [spline], target_K, target_alphaK, K_min, K_max)
 
 #check_step2_180(Ks_lin, Ks_geom, model_t89, x_input, mag_input, Re, spline_lin, spline_geom, K_range)
 
@@ -418,11 +423,12 @@ target_Emu = inv.calculate_E(target_mu, b_mag, target_alphaK)
 ######## Step 4: Calculate L*
 func_Lstar, _, _ = inv.info_calculate_Lstar(Lstar_opt)
 lstar = func_Lstar(target_alphaK, model_obj, inputs)
-
+if lstar <0:
+    lstar = np.nan
 
 '''                      Section 2: FEDU processing                      '''
-target_alphaK = 38.48988795*u.degree
-target_Emu = 2.75217844*u.MeV
+#target_alphaK = 38.48988795*u.degree
+#target_Emu = 2.75217844*u.MeV
 PA_fit_opt = '2'
 PA_fit_info = fp.info_fit_PA_flux(PA_fit_opt)
 ######## Step 5: Obtain j(alphaK) para cada canal de energía           #####
@@ -450,7 +456,7 @@ mageis_channels = fp.channels_to_use(mageis_cut_offs, mageis_N)
 
 ''' Solo una función fit PA '''
 print('ONE FUNCTION')
-'''
+
 # Obtenemos el mejor ajuste, usando solo una función determinada de antes
 rept_PA_fit_res = fp.fitting_alpha_flux(*PA_fit_info[2:], rept_fedu,
                   rept_channels, rept_alpha_bins, rept_N)
@@ -472,17 +478,18 @@ mageis_flux_alphaK = fp.fitted_flux_at_alphaK(mageis_PA_fit_res, mageis_func, ta
 
 flux_alphaK = [rept_flux_alphaK, mageis_flux_alphaK]
 energy_bins = [rept_energy_bins[rept_fit], mageis_energy_bins[mageis_fit]]
-'''
+if np.isnan(target_alphaK):
+    energy_bins = [rept_energy_bins[np.array([False]*12)], mageis_energy_bins[np.array([False]*25)]]
+
 ### Checkeamos el fit
-'''
-plots_fp.check_fit_PA_flux(rept_fit_opts, rept_func, rept_fedu, rept_bins, rept_PA_fit_res,
-         rept_flux_alphaK, target_alphaK, 'REPT', plots_dir, show_flag, save_flag)
+#plots_fp.check_fit_PA_flux(rept_fit_opts, rept_func, rept_fedu, rept_bins, rept_PA_fit_res,
+#         rept_flux_alphaK, target_alphaK, 'REPT', plots_dir, show_flag, save_flag)
 
 
-plots_fp.check_fit_PA_flux(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
-         mageis_PA_fit_res, mageis_flux_alphaK, target_alphaK, 'MagEIS',
-         plots_dir, show_flag, save_flag)
-'''
+#plots_fp.check_fit_PA_flux(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
+#         mageis_PA_fit_res, mageis_flux_alphaK, target_alphaK, 'MagEIS',
+#         plots_dir, show_flag, save_flag)
+
 ''' Selecciona la mejor función para fir PA '''
 # Obtenemos el mejor ajuste, probando las 2 posibles funciones
 
@@ -517,7 +524,9 @@ plots_fp.check_fit_PA_flux(mageis_fit_opts2, mageis_func2, mageis_fedu, mageis_b
 #poster.step5(PA_fit_info, mageis_fedu, mageis_bins, mageis_PA_fit_res, mageis_flux_alphaK, target_alphaK, 13)
 
 
-'''
+
+
+
 
 ############### Step 6: Obtain psd(Emu) using j(alphaK) for each energy
 
@@ -525,11 +534,14 @@ plots_fp.check_fit_PA_flux(mageis_fit_opts2, mageis_func2, mageis_fedu, mageis_b
 energy_to_fit, energy_flux_to_fit = fp.join_energy_flux(flux_alphaK, energy_bins,
                                     unit_flux_mev)
 
+
 ### Calculamos psd to fit at target alphaK
 energy_psd_to_fit = fp.flux_to_psd(energy_to_fit, energy_flux_to_fit[:, np.newaxis],
-                                    unit_c, unit_flux_mev)
-energy_psd_to_fit = energy_psd_to_fit[:,0]
-
+                                    units_psd)
+try:
+    energy_psd_to_fit = energy_psd_to_fit[:,0]
+except:
+    pass
 ### Plot energy flux j(E, alphaK) for target alphaK
 
 flag_log = True
@@ -549,7 +561,7 @@ if energy_fit_opt[1] == 'flux':
     energy_fit_results = fp.fitted_y_at_Emu(energy_to_fit, y_data_to_fit,
                          *energy_fit_info[2:], 'flux', Emu)
     fit_obj, parms, flux_Emu = energy_fit_results
-    psd_Emu = fp.flux_to_psd(Emu, flux_Emu, unit_c, unit_flux_mev)
+    psd_Emu = fp.flux_to_psd(Emu, flux_Emu, units_psd)
 elif energy_fit_opt[1] == 'psd':
     y_data_to_fit = energy_psd_to_fit
     energy_fit_results = fp.fitted_psd_at_Emu(energy_to_fit, y_data_to_fit,
@@ -563,4 +575,3 @@ plots_fp.check_fit_energy_data(energy_fit_results, energy_to_fit,
          plots_dir, show_flag, save_flag)
 
 #poster.step6(energy_fit_results, energy_to_fit, y_data_to_fit, energy_fit_info, energy_range_plot, Emu, save=0)
-'''

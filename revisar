@@ -1,21 +1,19 @@
 Agregar datos de emfisis
 Error asociado al campo magnético
-guía para github
 
 
-qué pasa cuando un target alpha es nan?
-preguntar hro y hro2
+preguntar hro y hro2 -> qué dataset de omni usar
 qué pasa si ect tiene menos resolución
-Paralelizar el código
+Paralelizar el código0
 
 
-
-target alpha es nan -> arreglar
 Agregar otro modelo TS
 
 crear función all steps o steps inv y steps fedu -> esto es para poder paralelizar
 
 k grandes y k chicos se traducen a pich angle grande o chico?
+
+pyspedas
 
     ##############3
 

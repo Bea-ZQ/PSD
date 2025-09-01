@@ -223,7 +223,7 @@ def step2(alphas, Ks, target_Ks):
     # Obtenemos el valor de alpha para cada uno de los target K
     target_alphasK = np.empty(len(target_Ks))
     for i, K in enumerate(target_Ks):
-        alphaK = inv.interpolate_alpha_K(K, spline)
+        alphaK = inv.interpolate_alpha_K(K, K_max, spline)
         target_alphasK[i] = alphaK.value
 
     out_alphas = target_alphasK*alphas.unit
@@ -233,27 +233,22 @@ def step2(alphas, Ks, target_Ks):
     return out_alphas, spline, K_min, K_max
 
 
-def step3_model(mf_model, inputs, alphasK, mus, energy_range):
+def step3_model(mf_model, inputs, alphasK, mus):
     # Step 3: Calcular target energy(mu,K) of chosen mu and K
     print('------------------------------------------------------------------------')
     print('STEP 3: Calculate target E_mu for fixed mu and K')
     print('------------------------------------------------------------------------')
     print('* Using model for local magnenitc field for calculation:')
-
+    print()
     list_Esmu = []
-    E_min, E_max = energy_range
     ### Obtenemos el campo magnético local en la posición del spacecraft
     ### usando IRBEM, recordar que está en nanoteslas
     with open(os.devnull, 'w') as fnull:
         with contextlib.redirect_stdout(fnull):
             dict_mag_field = mf_model.get_field_multi(*inputs)
             b_mag = dict_mag_field['Bl'][0]*u.nT
+#    print(b_mag)
     for alpha in alphasK:
-        mu_min = inv.calculate_mu(E_min, b_mag, alpha)
-        mu_max = inv.calculate_mu(E_max, b_mag, alpha)
-        print('* mu range for this time step:')
-        print(f'      - PA {alpha}: [{mu_min}, {mu_max}]')
-
         Esmu = inv.calculate_E(mus, b_mag, alpha)
         list_Esmu.append(Esmu)
         print('* Target mus: ', mus)
@@ -279,13 +274,16 @@ def step4(mf_model, inputs, alphasK, info_Lstar, save_lstar):
     with open(os.devnull, 'w') as fnull:
         with contextlib.redirect_stdout(fnull):
             for i, alpha in enumerate(alphasK):
-                lstar = func_Lstar(alpha, mf_model, inputs)
-                if lstar <0:
-                    lstar = np.nan
+                if np.isnan(alpha):
+                    lstar=np.nan
+                else:
+                    lstar = func_Lstar(alpha, mf_model, inputs)
+                    if lstar <0:
+                        lstar = np.nan
                 df_lstar.loc[index, str(Ks[i])] = [lstar]*N_mus
 
     print('* Target alphasK: ', alphasK)
-    print('* Lstar at target alphasK: ', df_lstar.loc[index])
+    print('* Lstar at target alphasK:\n ', df_lstar.loc[index])
     print()
     return df_lstar
 
@@ -301,33 +299,45 @@ def step5_onefunc(fit_info, fedu, channels_to_use, list_bins, N_energy, alphasK,
     func_opt, str_func, func, p0, lims = fit_info
     energy_bins, alpha_bins = list_bins
     df_rmse, df_r2, index = save_errors
+    cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
 
     print(f'* Using function {func_opt} for interpolation:')
     print(f'      {str_func}')
     print(f'* Instrumet: {inst}')
     # Obtenemos el mejor ajuste
-    with open(os.devnull, 'w') as fnull:
-        with contextlib.redirect_stdout(fnull):
-            fit_results = fp.fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_energy)
-    fit, parameters, max_values= fit_results[:3]
-    err_fit = fit_results[4]
 
-    cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
-    df_rmse.loc[index, cols] = err_fit[:,0]
-    df_r2.loc[index, cols] = err_fit[:,1]
+    if np.all(np.isnan(alphasK)):
+#        print('Todos los alphas son nan, así que no vale la pena hacer los ajustes')
+        js_alphasK = np.array([[]]*len(alphasK)).T
 
-    # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
-    array_indexes = np.array(range(N_energy))[fit]
-    js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
-    for i, idx in enumerate(array_indexes):
-        max_flux = max_values[idx]
-        par_opt = parameters[idx]
-        js_idx = func(np.radians(alphasK.value), *par_opt)
-        js_alphasK[i, :] = js_idx*max_flux.value
+        df_rmse.loc[index, cols] = np.full(len(channels_to_use), np.nan)
+        df_r2.loc[index, cols] = np.full(len(channels_to_use), np.nan)
 
-    energy_bins_to_use = energy_bins[fit]
-    print()
-    return js_alphasK*max_values.unit, energy_bins_to_use, fit_results
+        return js_alphasK*fedu.unit, []*energy_bins.unit, 0
+
+    else:
+#        print('Al menos un alpha no es nan, así que tenemos que hacer los ajustes')
+        with open(os.devnull, 'w') as fnull:
+            with contextlib.redirect_stdout(fnull):
+                fit_results = fp.fitting_alpha_flux(func, p0, lims, fedu, channels_to_use, alpha_bins, N_energy)
+        fit, parameters, max_values= fit_results[:3]
+        err_fit = fit_results[4]
+
+        df_rmse.loc[index, cols] = err_fit[:,0]
+        df_r2.loc[index, cols] = err_fit[:,1]
+
+        # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
+        array_indexes = np.array(range(N_energy))[fit]
+        js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
+        for i, idx in enumerate(array_indexes):
+            max_flux = max_values[idx]
+            par_opt = parameters[idx]
+            js_idx = func(np.radians(alphasK.value), *par_opt)
+            js_alphasK[i, :] = js_idx*max_flux.value
+
+        energy_bins_to_use = energy_bins[fit]
+        print()
+        return js_alphasK*max_values.unit, energy_bins_to_use, fit_results
 
 
 
@@ -341,34 +351,47 @@ def step5_bestfunc(list_fit_info, fedu, channels_to_use, list_bins, N_energy, al
 
     energy_bins, alpha_bins = list_bins
     df_rmse, df_r2, index = save_errors
+    cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
 
     print(f'* Using functions best function for interpolation:')
     print(f'      ')
     print(f'* Instrumet: {inst}')
-    # Obtenemos el mejor ajuste
-    with open(os.devnull, 'w') as fnull:
-        with contextlib.redirect_stdout(fnull):
-            fit_results = fp.fitting_alpha_flux_V2(list_fit_info, fedu, channels_to_use, alpha_bins, N_energy)
 
-    fit, parameters, max_values, _, err_fit, fit_opts, funcs = fit_results
+    if np.all(np.isnan(alphasK)):
+#        print('Todos los alphas son nan, así que no vale la pena hacer los ajustes')
+        js_alphasK = np.array([[]]*len(alphasK)).T
 
-    cols = df_rmse.columns[df_rmse.columns.str.contains(inst)]
-    df_rmse.loc[index, cols] = err_fit[:,0]
-    df_r2.loc[index, cols] = err_fit[:,1]
+        df_rmse.loc[index, cols] = np.full(len(channels_to_use), np.nan)
+        df_r2.loc[index, cols] = np.full(len(channels_to_use), np.nan)
 
-    # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
-    array_indexes = np.array(range(N_energy))[fit]
-    js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
-    for i, idx in enumerate(array_indexes):
-        func = funcs[idx]
-        max_flux = max_values[idx]
-        par_opt = parameters[idx]
-        js_idx = func(np.radians(alphasK.value), *par_opt)
-        js_alphasK[i, :] = js_idx*max_flux.value
+        return js_alphasK*fedu.unit, []*energy_bins.unit, 0
 
-    energy_bins_to_use = energy_bins[fit]
-    print()
-    return js_alphasK*max_values.unit, energy_bins_to_use, fit_results
+    else:
+#        print('Al menos un alpha no es nan, así que tenemos que hacer los ajustes')
+
+        # Obtenemos el mejor ajuste
+        with open(os.devnull, 'w') as fnull:
+            with contextlib.redirect_stdout(fnull):
+                fit_results = fp.fitting_alpha_flux_V2(list_fit_info, fedu, channels_to_use, alpha_bins, N_energy)
+
+        fit, parameters, max_values, _, err_fit, fit_opts, funcs = fit_results
+
+        df_rmse.loc[index, cols] = err_fit[:,0]
+        df_r2.loc[index, cols] = err_fit[:,1]
+
+        # Usamos el mejor ajuste para calcular flujo at target alphaK, j(alphaK)
+        array_indexes = np.array(range(N_energy))[fit]
+        js_alphasK = np.full((len(array_indexes), len(alphasK)), np.nan)
+        for i, idx in enumerate(array_indexes):
+            func = funcs[idx]
+            max_flux = max_values[idx]
+            par_opt = parameters[idx]
+            js_idx = func(np.radians(alphasK.value), *par_opt)
+            js_alphasK[i, :] = js_idx*max_flux.value
+
+        energy_bins_to_use = energy_bins[fit]
+        print()
+        return js_alphasK*max_values.unit, energy_bins_to_use, fit_results
 
 
 
@@ -385,25 +408,53 @@ def step6_flux(energy, array_flux, fit_info, Esmu, alphasK, units_psd, save_psd)
     df_psd, index, Ks = save_psd
     print(f'* Using function {fit_opt} for interpolating flux:')
     print(f'      {str_func}')
+    try:
+        E_max = energy[-1]
+    except:
+        E_max = 0
 
+#    print('E_max', E_max)
+#    print('target Esmu', Esmu)
     list_params = []
     list_fit_obj = []
     for i in range(len(alphasK)):
         flux = array_flux[:,i]
         Es = Esmu[i]
-        with open(os.devnull, 'w') as fnull:
-            with contextlib.redirect_stdout(fnull):
-                fit_results = fp.fitted_y_at_Emu(energy, flux, fitter, p0, lims,'flux', Es)
-        fit_obj, parms, j_Es = fit_results
-        f_Es = fp.flux_to_psd(Es, j_Es, units_psd)
+        mask = np.isnan(flux.value)
+        flux = flux[~mask]
+#        print(i, flux, Es)
+        Es2 = Es.copy()
+        if E_max ==0:
+            # No hay fit
+            j_Es = np.array([np.nan]*len(Es))*flux.unit
+            fit_obj = False
+            parms = False
+        elif np.all(np.isnan(Es)):
+            # No hay fit
+            j_Es = np.array([np.nan]*len(Es))*flux.unit
+            fit_obj = False
+            parms = False
 
+        else:
+            bool2 = Es2 > E_max
+#            print(bool2)
+            Es2[bool2] = np.nan*E_max.unit
+#            print(Es2)
+
+            with open(os.devnull, 'w') as fnull:
+                with contextlib.redirect_stdout(fnull):
+                    fit_results = fp.fitted_y_at_Emu(energy, flux, fitter, p0, lims,'flux', Es2)
+            fit_obj, parms, j_Es = fit_results
+
+        f_Es = fp.flux_to_psd(Es, j_Es, units_psd)
+#        print(j_Es, f_Es)
         df_psd.loc[index, str(Ks[i])] = f_Es
         list_params.append(parms)
         list_fit_obj.append(fit_obj)
 
         print('* Target K: ', Ks[i])
         print('* Target alphaK: ', alphasK[i])
-        print('* Target Esmu: ', Es)
+        print('* Target Esmu: ', Es2)
         print('* PSD at target alphaK and Esmu: ', f_Es)
         print()
     return df_psd, list_fit_obj, list_params
@@ -423,17 +474,48 @@ def step6_psd(energy, array_flux, fit_info, Esmu, alphasK, units_psd, save_psd):
     print(f'      {str_func}')
 
     ### Calculamos psd to fit at target alphaK
-    array_psd = fp.flux_to_psd(energy, array_flux, units_psd)
+    try:
+        E_max = energy[-1]
+    except:
+        E_max = 0
+#    print('E_max', E_max)
+#    print('target Esmu', Esmu)
 
+    array_psd = fp.flux_to_psd(energy[:,np.newaxis], array_flux, units_psd)
+#    print(array_psd)
     list_params = []
     list_fit_obj = []
     for i in range(len(alphasK)):
         psd = array_psd[:,i]
         Es = Esmu[i]
-        with open(os.devnull, 'w') as fnull:
-            with contextlib.redirect_stdout(fnull):
-                fit_results = fp.fitted_y_at_Emu(energy, psd, fitter, p0, lims,'psd', Es)
-        fit_obj, parms, f_Es = fit_results
+        mask = np.isnan(psd.value)
+        psd = psd[~mask]
+#        print(i, psd, Es)
+        Es2 = Es.copy()
+
+        if E_max ==0:
+            # No hay fit
+            f_Es = np.array([np.nan]*len(Es))*psd.unit
+            fit_obj = False
+            parms = False
+
+        elif np.all(np.isnan(Es)):
+            # No hay fit
+            f_Es = np.array([np.nan]*len(Es))*psd.unit
+            fit_obj = False
+            parms = False
+
+        else:
+            bool2 = Es2 > E_max
+#            print(bool2)
+            Es2[bool2] = np.nan*E_max.unit
+#            print(Es2)
+
+
+            with open(os.devnull, 'w') as fnull:
+                with contextlib.redirect_stdout(fnull):
+                    fit_results = fp.fitted_y_at_Emu(energy, psd, fitter, p0, lims,'psd', Es2)
+            fit_obj, parms, f_Es = fit_results
 
         df_psd.loc[index, str(Ks[i])] = f_Es
         list_params.append(parms)
@@ -441,7 +523,7 @@ def step6_psd(energy, array_flux, fit_info, Esmu, alphasK, units_psd, save_psd):
 
         print('* Target K: ', Ks[i])
         print('* Target alphaK: ', alphasK[i])
-        print('* Target Esmu: ', Es)
+        print('* Target Esmu: ', Es2)
         print('* PSD at target alphaK and Esmu: ', f_Es)
         print()
 
@@ -449,7 +531,7 @@ def step6_psd(energy, array_flux, fit_info, Esmu, alphasK, units_psd, save_psd):
 
 
 def psd_calculation(channels_to_use, options_psd, options_model, targets,
-                    inputs, energy_range, bins, units, N_steps = 10e6, N_alphas = 20):
+                    inputs, bins, units, N_steps = 10e6, N_alphas = 20):
 
     rept_cut_offs, rept_N, mageis_cut_offs, mageis_N = channels_to_use
     PA_fit_opt, energy_fit_opt, K_opt, Lstar_opt = options_psd
@@ -465,7 +547,6 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
     alphas_left = np.geomspace(30, 3, N_alphas)[::-1]*u.degree
     alphas_total = np.concatenate([alphas_left, alphas_right])
 
-    energy_range = energy_range*u.MeV
     _, _, unit_K, _ = units_inv
     unit_flux_mev, _ = units_flux
 
@@ -537,14 +618,13 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
 
         ''' Step 1: Calcular K para distintos PA alphas '''
         alphas, Ks = step1(model_obj, inputs, alphas_total, info_K, unit_K)
-        print(alphas)
-        print(Ks)
+#        print(alphas)
+#        print(Ks)
         ''' Step 2: Interpolar la función alpha(K) y calcular target alpha_K '''
         target_alphasK, spline, K_min, K_max = step2(alphas, Ks, target_Ks)
 
         ''' Step 3: Calcular energía(mu,K) of chosen mu and K '''
-        target_Esmu = step3_model(model_obj, inputs, target_alphasK, target_mus,
-                      energy_range)
+        target_Esmu = step3_model(model_obj, inputs, target_alphasK, target_mus)
 
         ''' Step 4: Calculate L* '''
         df_lstar = step4(model_obj, inputs, target_alphasK, info_Lstar,
@@ -560,8 +640,9 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
         mageis  = step5(PA_fit_info, mageis_fedu, mageis_channels, mageis_bins,
                   mageis_N, target_alphasK, 'MagEIS', save_errors)
 
-        rept_flux_alphasK, rept_energy, _ = rept
-        mageis_flux_alphasK, mageis_energy, _ = mageis
+        rept_flux_alphasK, rept_energy, rept_PA_fit_res = rept
+        mageis_flux_alphasK, mageis_energy, mageis_PA_fit_res = mageis
+
 
         flux_alphasK = [rept_flux_alphasK, mageis_flux_alphasK]
         energy_bins = [rept_energy, mageis_energy]

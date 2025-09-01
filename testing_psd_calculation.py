@@ -31,7 +31,7 @@ import IRBEM
 flag_dwnl= False
 
 ### Modelo campo magnético a usar (opciones: T89, T96)
-flag_model = 'T96'
+flag_model = 'T89'
 
 ### Resolución datos omni a usar
 res_omni = '1h'
@@ -58,20 +58,21 @@ options = [1,0,0,0,0]
 sat = 'a'
 
 ### Valores de testeo para K, alphaK, mu y Emu.
-target_mus = [0.02, 0.01]
-target_Ks = [100, 80, 120]
-#target_Ks = [60]
+target_mus = [0.02, 0.03]
+#target_Ks = [100, 80, 120]
+target_Ks = [500, 80]
+#target_Ks = [600, 500]
 
 # Rangos de energía para los plots
 E_min = 0.01*u.MeV # MeV
-E_max = 10*u.MeV # MeV
+E_max = 15*u.MeV # MeV
 energy_range_plot = [E_min, E_max]
 
 
 ### Cut offs canales de energía (para que no los usen)
 # Rept tiene 12 canales de energía
 rept_N = 12
-rept_cut_offs = [1, 6]
+rept_cut_offs = [1, 12]
 rept_channels = fp.channels_to_use(rept_cut_offs, rept_N)
 
 # mageis tiene 25 canales de energía
@@ -86,6 +87,7 @@ PA_fit_opt = '2'
 # Energía (opciones: ('pl', 'flux'), ('exp', 'psd'), ('spl', 'flux')
 #                    ('spl', 'psd'), ('lin', 'flux'), ('lin', 'psd'))
 energy_fit_opt = ('lin', 'flux')
+#energy_fit_opt = ('lin', 'psd')
 
 ### Fijamos la opción para el cálculo de K
 # Opciones (1: mirror points, 2: drift_bounce, 3:integración propia)
@@ -208,9 +210,11 @@ df_rmse2 = pd.DataFrame(columns=all_cols)
 df_r22 = pd.DataFrame(columns=all_cols)
 
 # Loop en el tiempo
-N = 2
-show = False
-for i in range(N):
+N1 = 201
+N2 = 202
+show = True
+for i in range(N1, N2):
+    print(i)
     # Obtenemos los inputs del modelo de campo magnético, para el timestep i
     inputs = [x_inputs[i], mag_inputs[i]]
     timestamp = x_inputs[i]['dateTime']
@@ -238,8 +242,7 @@ for i in range(N):
                               spline, target_Ks, target_alphasK)
 
     ''' Step 3: Calcular energía(mu,K) of chosen mu and K '''
-    target_Esmu = psd.step3_model(model_obj, inputs, target_alphasK, target_mus,
-                  energy_range_plot)
+    target_Esmu = psd.step3_model(model_obj, inputs, target_alphasK, target_mus)
 #    target_Esmu = [[0.5]*u.MeV, [2]*u.MeV]
 
     ''' Step 4: Calculate L* '''
@@ -257,20 +260,34 @@ for i in range(N):
     rept_flux_alphasK, rept_energy, rept_PA_fit_res= psd.step5_onefunc(PA_fit_info, rept_fedu,rept_channels, rept_bins, rept_N, target_alphasK, 'REPT', save_errors)
     mageis_flux_alphasK, mageis_energy, mageis_PA_fit_res = psd.step5_onefunc(PA_fit_info, mageis_fedu, mageis_channels, mageis_bins, mageis_N, target_alphasK, 'MagEIS', save_errors)
 
-    rept_fit_opts = [PA_fit_opt if val else None for val in rept_PA_fit_res[0]]
-    mageis_fit_opts = [PA_fit_opt if val else None for val in mageis_PA_fit_res[0]]
+    if rept_PA_fit_res ==0:
+        print('REPT')
+        print('No hicimos fits porque todos los targets alphas son nan')
+        print(target_alphasK)
+    else:
+        rept_fit_opts = [PA_fit_opt if val else None for val in rept_PA_fit_res[0]]
+        rept_func = [PA_fit_info[2] if val else None for val in rept_PA_fit_res[0]]
+        ### Checkeamos el fit
+        if show:
+            pass
+#            plots_psd_calc.check_step5(rept_fit_opts, rept_func, rept_fedu, rept_bins,
+#                      rept_PA_fit_res, rept_flux_alphasK, target_alphasK, 'REPT')
 
-    rept_func = [PA_fit_info[2] if val else None for val in rept_PA_fit_res[0]]
-    mageis_func = [PA_fit_info[2] if val else None for val in mageis_PA_fit_res[0]]
+    if mageis_PA_fit_res ==0:
+        print('MagEIS')
+        print('No hicimos fits porque todos los targets alphas son nan')
+        print(target_alphasK)
+    else:
+        mageis_fit_opts = [PA_fit_opt if val else None for val in mageis_PA_fit_res[0]]
+        mageis_func = [PA_fit_info[2] if val else None for val in mageis_PA_fit_res[0]]
+        ### Checkeamos el fit
+        if show:
+            pass
+#            plots_psd_calc.check_step5(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
+#                    mageis_PA_fit_res, mageis_flux_alphasK, target_alphasK,
+#                    'MagEIS')
 
     ### Checkeamos el fit
-    if show:
-        plots_psd_calc.check_step5(rept_fit_opts, rept_func, rept_fedu, rept_bins,
-                  rept_PA_fit_res, rept_flux_alphasK, target_alphasK, 'REPT')
-
-        plots_psd_calc.check_step5(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
-                  mageis_PA_fit_res, mageis_flux_alphasK, target_alphasK,
-                  'MagEIS')
 
     flux_alphasK = [rept_flux_alphasK, mageis_flux_alphasK]
     energy_bins = [rept_energy, mageis_energy]
@@ -284,14 +301,28 @@ for i in range(N):
     rept_flux_alphasK2, rept_energy2, rept_PA_fit_res2 = psd.step5_bestfunc(list_PA_fit_info, rept_fedu,rept_channels, rept_bins, rept_N, target_alphasK, 'REPT', save_errors2)
     mageis_flux_alphasK2, mageis_energy2, mageis_PA_fit_res2 = psd.step5_bestfunc(list_PA_fit_info, mageis_fedu, mageis_channels, mageis_bins, mageis_N, target_alphasK, 'MagEIS', save_errors2)
 
-    ### Checkeamos el fit
-    if show:
-        plots_psd_calc.check_step5(rept_PA_fit_res2[5], rept_PA_fit_res2[6], rept_fedu, rept_bins,
-                  rept_PA_fit_res2, rept_flux_alphasK2, target_alphasK, 'REPT')
+    if rept_PA_fit_res2 ==0:
+        print('REPT')
+        print('No hicimos fits porque todos los targets alphas son nan')
+        print(target_alphasK)
+    else:
+        ### Checkeamos el fit
+        if show:
+            pass
+#            plots_psd_calc.check_step5(rept_PA_fit_res2[5], rept_PA_fit_res2[6], rept_fedu, rept_bins,
+#                      rept_PA_fit_res2, rept_flux_alphasK2, target_alphasK, 'REPT')
 
-        plots_psd_calc.check_step5(mageis_PA_fit_res2[5], mageis_PA_fit_res2[6], mageis_fedu, mageis_bins,
-                  mageis_PA_fit_res2, mageis_flux_alphasK2, target_alphasK,
-                  'MagEIS')
+    if mageis_PA_fit_res ==0:
+        print('MagEIS')
+        print('No hicimos fits porque todos los targets alphas son nan')
+        print(target_alphasK)
+    else:
+        ### Checkeamos el fit
+        if show:
+            pass
+#            plots_psd_calc.check_step5(mageis_PA_fit_res2[5], mageis_PA_fit_res2[6], mageis_fedu, mageis_bins,
+#                    mageis_PA_fit_res2, mageis_flux_alphasK2, target_alphasK,
+#                    'MagEIS')
 
 
     ''' Step 6: Obtain psd(Emu) using j(alphaK) for each energy '''
@@ -314,5 +345,5 @@ for i in range(N):
 
 
 
-plots_psd_calc.psd_lstar(df_psd, df_lstar, target_Ks[0], target_mus[0])
-plots_psd_calc.psd_time(df_psd, target_Ks[0], target_mus[0])
+#plots_psd_calc.psd_lstar(df_psd, df_lstar, target_Ks[0], target_mus[0])
+#plots_psd_calc.psd_time(df_psd, target_Ks[0], target_mus[0])

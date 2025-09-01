@@ -27,7 +27,7 @@ save_dir = str(cwd_path.parents[1]/'Data'/'PSD'/'')
 flag_dwnl= False
 
 ### Modelo campo magnético a usar (opciones: T89, T96)
-flag_model = 'T96'
+flag_model = 'T89'
 
 ### Resolución datos omni a usar
 res_omni = '1h'
@@ -44,7 +44,7 @@ time_avg = '1min'
 #end_time = '2013-05-30 23:59:59'
 #type = 'day'
 
-start_time = '2013-05-30 03:00:00'
+start_time = '2013-05-30 03:21:00'
 end_time = '2013-05-30 07:00:00'
 type = 'storm'
 
@@ -65,15 +65,14 @@ _, _, unit_K, unit_mu = units_inv
 target_mus = [0.02, 0.01]*unit_mu
 target_Ks = [60, 100, 200, 40]*unit_K
 target_Ks = [100, 80]*unit_K
+target_Ks = [500, 80]*unit_K
+#target_Ks = [500, 600]*unit_K
 
-# Rangos de energía para los plots
-E_min = 0.01 # MeV
-E_max = 10 # MeV
 
 ### Cut offs canales de energía (para que no los usen)
 # REPT tiene 12 canales de energía
 rept_N = 12
-rept_cut_offs = [1, 6]
+rept_cut_offs = [1, 12]
 
 # MagEIS tiene 25 canales de energía
 mageis_N = 25
@@ -113,7 +112,6 @@ channels_to_use = [rept_cut_offs, rept_N, mageis_cut_offs, mageis_N]
 targets = [target_Ks, target_mus]
 times = [start_time, end_time]
 data_dirs = [data_dir_ect, data_dir_omni]
-energy_range = [E_min, E_max]
 
 ### Obtenemos los inputs
 inputs, bins = psd_calc.get_inputs(times, sat, data_dirs, flag_dwnl, opts_model,
@@ -128,8 +126,10 @@ inputs, bins = psd_calc.get_inputs(times, sat, data_dirs, flag_dwnl, opts_model,
 '''
 
 df_psd, df_lstar, df_rmse, df_r2 = psd_calc.psd_calculation(channels_to_use, opts_psd, opts_model,
-                   targets, inputs, energy_range, bins, units, N_steps = 10e9)
+                   targets, inputs, bins, units, N_steps = 3)
 
+
+'''
 
 
 plots_psd_calc.psd_lstar(df_psd, df_lstar, target_Ks[0], target_mus[0])
@@ -138,3 +138,4 @@ plots_psd_calc.psd_time(df_psd, target_Ks[0], target_mus[0])
 
 psd_proc.save_psd_data(save_dir, df_psd, df_lstar, df_rmse, df_r2, targets, times,
                   flag_model, time_avg, sat, type)
+'''

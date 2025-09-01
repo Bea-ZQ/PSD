@@ -46,6 +46,9 @@ def K_mirror_points(alphas, model, inputs, unit_K):
 
 
 def K_drift_bounce(alphas, model, inputs, unit_K):
+    '''
+    Esta es la única fn que modifiqué para el caso con b<0
+    '''
     # Opción 2. Cálculo de K(alpha) usando drift_bounce_orbit
     x_input, mag_input = inputs
     Ks  = []
@@ -145,13 +148,16 @@ def interpolator_alpha(alphas, Ks):
     return spline
 
 
-def interpolate_alpha_K(K, spline, flag=False):
+def interpolate_alpha_K(K, K_max, spline, flag=False):
     try:
         alpha = spline(np.log10(K.value))
     except TypeError:
         alpha = np.nan
 
     if (alpha<2) | (alpha >90):
+        alpha = np.nan
+
+    if K > K_max:
         alpha = np.nan
 
     if flag:
