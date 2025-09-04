@@ -126,7 +126,7 @@ inputs, bins = psd_calc.get_inputs(times, sat, data_dirs, flag_dwnl, opts_model,
 '''
 
 df_psd, df_lstar, df_rmse, df_r2 = psd_calc.psd_calculation(channels_to_use, opts_psd, opts_model,
-                   targets, inputs, bins, units, N_steps = 3)
+                   targets, inputs, bins, units, N_steps = 5)
 
 
 '''

@@ -233,21 +233,14 @@ def step2(alphas, Ks, target_Ks):
     return out_alphas, spline, K_min, K_max
 
 
-def step3_model(mf_model, inputs, alphasK, mus):
+def step3(b_mag, alphasK, mus):
     # Step 3: Calcular target energy(mu,K) of chosen mu and K
     print('------------------------------------------------------------------------')
     print('STEP 3: Calculate target E_mu for fixed mu and K')
     print('------------------------------------------------------------------------')
-    print('* Using model for local magnenitc field for calculation:')
     print()
     list_Esmu = []
-    ### Obtenemos el campo magnético local en la posición del spacecraft
-    ### usando IRBEM, recordar que está en nanoteslas
-    with open(os.devnull, 'w') as fnull:
-        with contextlib.redirect_stdout(fnull):
-            dict_mag_field = mf_model.get_field_multi(*inputs)
-            b_mag = dict_mag_field['Bl'][0]*u.nT
-#    print(b_mag)
+
     for alpha in alphasK:
         Esmu = inv.calculate_E(mus, b_mag, alpha)
         list_Esmu.append(Esmu)
@@ -624,7 +617,8 @@ def psd_calculation(channels_to_use, options_psd, options_model, targets,
         target_alphasK, spline, K_min, K_max = step2(alphas, Ks, target_Ks)
 
         ''' Step 3: Calcular energía(mu,K) of chosen mu and K '''
-        target_Esmu = step3_model(model_obj, inputs, target_alphasK, target_mus)
+        b_mag = inv.get_B_model(model_obj, inputs)
+        target_Esmu = step3(b_mag, target_alphasK, target_mus)
 
         ''' Step 4: Calculate L* '''
         df_lstar = step4(model_obj, inputs, target_alphasK, info_Lstar,

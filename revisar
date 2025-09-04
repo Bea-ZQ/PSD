@@ -13,9 +13,14 @@ crear función all steps o steps inv y steps fedu -> esto es para poder paraleli
 
 k grandes y k chicos se traducen a pich angle grande o chico?
 
-pyspedas
+hacer informe de todo lo que está pasando en psd calculation
 
-    ##############3
+
+Spacepy:
+- Revisar que para T96 los inputs sean parecidos entre omni mio y los de spacepy
+- Revisar irbem y spacepy den resultados parecidos
+- Encapsular en funciones las cosas para crear inputs de spacepy
+
 
 
 

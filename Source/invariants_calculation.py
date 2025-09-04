@@ -223,3 +223,13 @@ def info_calculate_Lstar(flag_Lstar):
         func = Lstar_drift_bounce
         str = 'drift_bounce_orbit'
     return func, str, flag_Lstar
+
+
+def get_B_model(model, inputs):
+    ### Obtenemos el campo magnético local en la posición del spacecraft
+    ### usando IRBEM, recordar que está en nanoteslas
+    print('* Using model for local magnenitc field calculation:')
+
+    dict_mag_field = model.get_field_multi(*inputs)
+    b_mag = dict_mag_field['Bl'][0]*u.nT
+    return b_mag

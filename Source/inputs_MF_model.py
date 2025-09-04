@@ -239,3 +239,10 @@ def check_mag_inputs(list_mag_inputs, omni_info, ect_info, res):
         print(key, flag_key)
         print('date', flag_date)
     print('----')
+
+
+def check_inputs_spy(omni, spy_left, spy_right, N, keys):
+    print('omni, left, right:')
+    for i in range(N):
+        for key in keys:
+            print(key, ': ', omni[i][key], ',',  spy_left[key][i], ',', spy_right[key][i])

@@ -21,6 +21,10 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import IRBEM
+import spacepy
+import spacepy.time
+import spacepy.irbempy
+import spacepy.coordinates
 
 '''
 ################################################################################
@@ -44,8 +48,8 @@ time_avg = '1min'
 start_time = '2013-05-30 00:00:00'
 end_time = '2013-05-31 23:59:59'
 
-#start_time = '2013-05-30 03:00:00'
-#end_time = '2013-05-30 07:00:00'
+start_time = '2013-05-30 09:00:00'
+end_time = '2013-05-30 13:00:00'
 
 sdate = start_time[:10]
 edate = end_time[:10]
@@ -59,9 +63,7 @@ sat = 'a'
 
 ### Valores de testeo para K, alphaK, mu y Emu.
 target_mus = [0.01, 0.02]
-#target_Ks = [100, 80, 120]
 target_Ks = [100, 80]
-#target_Ks = [600, 500]
 
 # Rangos de energía para los plots
 E_min = 0.01*u.MeV # MeV
@@ -87,7 +89,6 @@ PA_fit_opt = '2'
 # Energía (opciones: ('pl', 'flux'), ('exp', 'psd'), ('spl', 'flux')
 #                    ('spl', 'psd'), ('lin', 'flux'), ('lin', 'psd'))
 energy_fit_opt = ('lin', 'flux')
-#energy_fit_opt = ('lin', 'psd')
 
 ### Fijamos la opción para el cálculo de K
 # Opciones (1: mirror points, 2: drift_bounce, 3:integración propia)
@@ -128,7 +129,6 @@ model_obj = IRBEM.MagFields(options=options, kext=flag_model, verbose = False, s
 ###                             PARTE A: DATA                                ###
 ###     Descarga desde repositorio remoto: ECT-REPT, ECT-MagEIS & OMNI       ###
 ###     Carga desde repositorio local: ECT-REPT, ECT-MagEIS & OMNI           ###
-###     Creación inputs para el modelo de campo magnético y cálculo psd      ###
 ################################################################################
 '''
 
@@ -150,68 +150,125 @@ mageis_fedus, mageis_bins = mageis
 omni_info, omni_meta, omni_range = psd.step0_get_OMNI_data(start_time, end_time, data_dir_omni,
                        res_omni, file_type_omni, flag_dwnl, flag_model)
 
-### Creamos los inputs
+
+
+'''
+################################################################################
+###                      PARTE B: INPUTS IRBEM Y SPACEPY                                ###
+###     Creación inputs para los modelos de campo magnético y cálculo psd      ###
+################################################################################
+'''
+
+### Inputs para irbem
 inputs_mf, inputs_fedus, N = psd.step0_inputs(ect_info, omni_info, start_time,
                              end_time, res_omni, omni_range, rept_fedus, mageis_fedus,
                              units)
-
 x_inputs, mag_inputs = inputs_mf
-rept_fedus_inputs, mageis_fedus_inputs = inputs_fedus
 
+### Inputs para spacepy
+# Datos ect
+ect_filt = mf.filter_dates(ect_info, start_time, end_time)
+idx1 = ect_filt.index[0]
+idx2 = ect_filt.index[-1]
+dates, xs_geo, ys_geo, zs_geo = mf.get_GEO_coordinates(ect_filt, units_inv[0])
+
+times = spacepy.time.Ticktock(list(dates))
+list_coord = [[a, b, c] for a, b, c in zip(xs_geo, ys_geo, zs_geo)]
+coords = spacepy.coordinates.Coords(list_coord, dtype='GEO', carsph='car')
 
 '''
-################################################################################
-###                              PARTE B: PSD                                ###
-###           Aplicamos algoritmo para calcular PSD for each timestamp       ###
-################################################################################
 '''
+################################################################################
+###                   PARTE C: Cálculo invariantes usando spacepy            ###
+###           Usamos la lista completa, no recorremos cada elemento          ###
+################################################################################
 
-### Obtenemos info para los fits de pitch angle y energía. Es siempre la misma
-PA_fit_info = fp.info_fit_PA_flux(PA_fit_opt)
-energy_fit_info = fp.info_fit_energy_data(energy_fit_opt)
-
-### Obtenemos función para el cálculo de K y Lstar
-info_K = inv.info_calculate_K(K_opt)
-info_Lstar = inv.info_calculate_Lstar(Lstar_opt)
-
-# Fijamos cuál función para el step6 vamos a usar, dependiendo de si queremos
-# interpolar f(E) o j(E)
-if energy_fit_opt[1] == 'flux':
-    step6 = psd.step6_flux
-elif energy_fit_opt[1] == 'psd':
-    step6 = psd.step6_psd
+magkeys = {'Kp':0, 'Dst':1, 'dens':2, 'velo':3, 'Pdyn':4, 'ByIMF':5, 'BzIMF':6,
+           'G1':7, 'G2':8, 'G3':9, 'W1':10, 'W2':11, 'W3':12, 'W4':13, 'W5':14,
+           'W6':15}
 
 # Array de PAs en grados
 alphas_right = np.geomspace(30, 90, 21)[1:]*u.degree
 alphas_left = np.geomspace(30, 3, 20)[::-1]*u.degree
 alphas_total = np.concatenate([alphas_left, alphas_right])
+#spacepy.config['ncpus'] = 1
+n = spacepy.config['ncpus']
+print(n)
+# Step 1: calculamos K para el arreglo de alphas
+
+if n ==1:
+    dictK_left, args_left = spacepy.irbempy.get_Lstar(times, coords, extMag = flag_model, options = options, alpha = alphas_left)
+    dictK_right, args_right = spacepy.irbempy.get_Lstar(times, coords, extMag = flag_model, options = options, alpha = alphas_right)
+
+else:
+    dictK_left = spacepy.irbempy.get_Lstar(times, coords, extMag = flag_model, options = options, alpha = alphas_left)
+    dictK_right = spacepy.irbempy.get_Lstar(times, coords, extMag = flag_model, options = options, alpha = alphas_right)
+
+bmirr_left = dictK_left['Bmirr']
+I_left = dictK_left['Xj']
+K_left = I_left*np.sqrt(bmirr_left)
+
+bmirr_right = dictK_right['Bmirr']
+I_right = dictK_right['Xj']
+K_right = I_right*np.sqrt(bmirr_right)
+
+Ks = np.concatenate((K_left, K_right), axis=1)*unit_K
+
+### calculamos el campo magnético
+dictB = spacepy.irbempy.get_Bfield(times, coords, extMag=flag_model, options=options)
+blocal = dictB['Blocal']*u.nT
+
+if n ==1:
+    magin_spy_left = {}
+    magin_spy_right = {}
+    for key in omni_range:
+        magin_spy_left[key] = args_left[magkeys[key]]
+        magin_spy_right[key] = args_right[magkeys[key]]
+
+alphasK = []
+Esmu = []
+Lstar = []
+for i in range(len(times)):
+    list_K = Ks[i]
+    mask = np.isnan(list_K)
+    K = list_K[~mask]
+    alphas = alphas_total[~mask]
+    target_alphasK, _, _, _ = psd.step2(alphas, K, target_Ks)
+    alphasK.append(target_alphasK)
+    b = blocal[i]
+    target_Esmu = psd.step3(b, target_alphasK, target_mus)
+    Esmu.append(target_Esmu)
+
+    dictL, _ = spacepy.irbempy.get_Lstar(times[i], coords[i], extMag = flag_model,
+            options = options, alpha = target_alphasK)
+    Lstar.append(dictL['Lstar'])
+
+
+#mf.check_inputs_spy(mag_inputs, magin_spy_left, magin_spy_right, len(times), list(omni_range.keys()))
+
+'''
+################################################################################
+###                  PARTE D: Cálculo invariantes usando IRBEM               ###
+###                    Iteramos por cada elemento de la lista                ###
+################################################################################
+'''
+
+### Obtenemos función para el cálculo de K y Lstar
+info_K = inv.info_calculate_K(K_opt)
+info_Lstar = inv.info_calculate_Lstar(Lstar_opt)
 
 # Creamos los dataframes para guardar datos:
 labels_Ks = [str(x) for x in target_Ks]
 labels_mus = [str(x) for x in target_mus]
-
-#cols_lstar = pd.Index(labels_Ks, name='K')
 
 cols = pd.MultiIndex.from_product([labels_Ks, labels_mus], names=['K', 'mu'])
 df_psd = pd.DataFrame(columns = cols)
 df_lstar = pd.DataFrame(columns=cols)
 
 
-# Creamos los dataframes para guardar errores
-
-rept_cols = [f'REPT_{channel}' for channel in range(1, rept_N+1)]
-mageis_cols = [f'MagEIS_{channel}' for channel in range(1, mageis_N+1)]
-all_cols = rept_cols + mageis_cols
-
-df_rmse = pd.DataFrame(columns=all_cols)
-df_r2 = pd.DataFrame(columns=all_cols)
-
-df_rmse2 = pd.DataFrame(columns=all_cols)
-df_r22 = pd.DataFrame(columns=all_cols)
-
 # Loop en el tiempo
-N1 = 201
-N2 = 202
+N1 = 50
+N2 = 51
 show = True
 for i in range(N1, N2):
     print(i)
@@ -219,11 +276,6 @@ for i in range(N1, N2):
     inputs = [x_inputs[i], mag_inputs[i]]
     timestamp = x_inputs[i]['dateTime']
     print(f'TIMESTAMP {i}: ', timestamp)
-    # Obtenemos los flujo de REPT y MagEIS para el timestep i
-    rept_fedu = rept_fedus_inputs[i]
-    mageis_fedu = mageis_fedus_inputs[i]
-
-    save_psd = [df_psd, timestamp, target_Ks]
     save_lstar = [df_lstar, timestamp, target_Ks, target_mus]
 
 
@@ -233,118 +285,19 @@ for i in range(N1, N2):
     ### Obtenemos los valores de K para el arreglo de PA en unidades de Re*(nT**(1/2))
     alphas, Ks = psd.step1(model_obj, inputs, alphas_total, info_K, unit_K)
 
+
     ''' Step 2: Interpolar la función alpha(K) y calcular target alpha_K '''
     target_alphasK, spline, K_min, K_max = psd.step2(alphas, Ks, target_Ks)
-#    target_alphasK = [38, 58, ]*u.deg
+    target_alphasK = [38, 58, ]*u.deg
     ### Visualización
-    if show:
-        plots_psd_calc.check_step2(info_K, model_obj, inputs, unit_K, Ks, alphas,
-                              spline, target_Ks, target_alphasK)
+#    if show:
+#        plots_psd_calc.check_step2(info_K, model_obj, inputs, unit_K, Ks, alphas,
+#                              spline, target_Ks, target_alphasK)
 
     ''' Step 3: Calcular energía(mu,K) of chosen mu and K '''
     b_mag = inv.get_B_model(model_obj, inputs)
     target_Esmu = psd.step3(b_mag, target_alphasK, target_mus)
-#    target_Esmu = [[0.5]*u.MeV, [2]*u.MeV]
 
     ''' Step 4: Calculate L* '''
     df_lstar = psd.step4(model_obj, inputs, target_alphasK, info_Lstar,
                          save_lstar)
-
-
-    #######################  Section 2: FEDU processing  #######################
-
-    ''' Step 5: Obtain j(alphaK) for each energy channel '''
-
-    ''' using only one function'''
-    save_errors = [df_rmse, df_r2, timestamp]
-    ### Ajustar REPT y MagEIS PA flux y calculamos flux at target alphaK
-    rept_flux_alphasK, rept_energy, rept_PA_fit_res= psd.step5_onefunc(PA_fit_info, rept_fedu,rept_channels, rept_bins, rept_N, target_alphasK, 'REPT', save_errors)
-    mageis_flux_alphasK, mageis_energy, mageis_PA_fit_res = psd.step5_onefunc(PA_fit_info, mageis_fedu, mageis_channels, mageis_bins, mageis_N, target_alphasK, 'MagEIS', save_errors)
-
-    if rept_PA_fit_res ==0:
-        print('REPT')
-        print('No hicimos fits porque todos los targets alphas son nan')
-        print(target_alphasK)
-    else:
-        rept_fit_opts = [PA_fit_opt if val else None for val in rept_PA_fit_res[0]]
-        rept_func = [PA_fit_info[2] if val else None for val in rept_PA_fit_res[0]]
-        ### Checkeamos el fit
-        if show:
-            pass
-#            plots_psd_calc.check_step5(rept_fit_opts, rept_func, rept_fedu, rept_bins,
-#                      rept_PA_fit_res, rept_flux_alphasK, target_alphasK, 'REPT')
-
-    if mageis_PA_fit_res ==0:
-        print('MagEIS')
-        print('No hicimos fits porque todos los targets alphas son nan')
-        print(target_alphasK)
-    else:
-        mageis_fit_opts = [PA_fit_opt if val else None for val in mageis_PA_fit_res[0]]
-        mageis_func = [PA_fit_info[2] if val else None for val in mageis_PA_fit_res[0]]
-        ### Checkeamos el fit
-        if show:
-            pass
-#            plots_psd_calc.check_step5(mageis_fit_opts, mageis_func, mageis_fedu, mageis_bins,
-#                    mageis_PA_fit_res, mageis_flux_alphasK, target_alphasK,
-#                    'MagEIS')
-
-    ### Checkeamos el fit
-
-    flux_alphasK = [rept_flux_alphasK, mageis_flux_alphasK]
-    energy_bins = [rept_energy, mageis_energy]
-
-
-    #rmse, r2
-    save_errors2 = [df_rmse2, df_r22, timestamp]
-    ''' Selecting best function'''
-    list_PA_fit_info = [fp.info_fit_PA_flux('1'), fp.info_fit_PA_flux('2')]
-
-    rept_flux_alphasK2, rept_energy2, rept_PA_fit_res2 = psd.step5_bestfunc(list_PA_fit_info, rept_fedu,rept_channels, rept_bins, rept_N, target_alphasK, 'REPT', save_errors2)
-    mageis_flux_alphasK2, mageis_energy2, mageis_PA_fit_res2 = psd.step5_bestfunc(list_PA_fit_info, mageis_fedu, mageis_channels, mageis_bins, mageis_N, target_alphasK, 'MagEIS', save_errors2)
-
-    if rept_PA_fit_res2 ==0:
-        print('REPT')
-        print('No hicimos fits porque todos los targets alphas son nan')
-        print(target_alphasK)
-    else:
-        ### Checkeamos el fit
-        if show:
-            pass
-#            plots_psd_calc.check_step5(rept_PA_fit_res2[5], rept_PA_fit_res2[6], rept_fedu, rept_bins,
-#                      rept_PA_fit_res2, rept_flux_alphasK2, target_alphasK, 'REPT')
-
-    if mageis_PA_fit_res ==0:
-        print('MagEIS')
-        print('No hicimos fits porque todos los targets alphas son nan')
-        print(target_alphasK)
-    else:
-        ### Checkeamos el fit
-        if show:
-            pass
-#            plots_psd_calc.check_step5(mageis_PA_fit_res2[5], mageis_PA_fit_res2[6], mageis_fedu, mageis_bins,
-#                    mageis_PA_fit_res2, mageis_flux_alphasK2, target_alphasK,
-#                    'MagEIS')
-
-
-    ''' Step 6: Obtain psd(Emu) using j(alphaK) for each energy '''
-
-    ### Mezclamos mageis y rept fluxes at target alphaK
-    energy_to_fit, energy_flux_to_fit = fp.join_energy_flux(flux_alphasK,
-                                        energy_bins, unit_flux_mev)
-
-    ### Ajustar y=flux/psd at target alphaK y calculamos psd at target E_mu
-    df_psd, fit_objs, pars = step6(energy_to_fit, energy_flux_to_fit,
-                             energy_fit_info, target_Esmu, target_alphasK,
-                             units_psd, save_psd)
-
-    ### Checkeamos los datos y el fit
-    if show:
-        plots_psd_calc.check_step6(energy_flux_to_fit, energy_to_fit, target_alphasK,
-        target_Ks, fit_objs, pars, df_psd, energy_fit_info, energy_range_plot,
-        target_Esmu, units_psd, fp.flux_to_psd)
-    show = False
-
-
-
-#plots_psd_calc.psd_lstar(df_psd, df_lstar, target_Ks[0], target_mus[0])
-#plots_psd_calc.psd_time(df_psd, target_Ks[0], target_mus[0])
